@@ -1,0 +1,13 @@
+#! /bin/sh
+
+cc -std=c11 -pedantic -Wall -Wextra \
+    -Wno-deprecated-declarations \
+    -Wno-missing-field-initializers \
+    -fno-omit-frame-pointer \
+    -D_POSIX_C_SOURCE=200809L \
+    -g -o program \
+    src/linux/bag_x11.c src/linux/audio_alsa.c src/glad/gl.c \
+    src/main.c src/utils.c src/res.c src/animation.c src/core.c src/audio.c src/gui.c \
+    -Isrc -Isrc/glad/include \
+    -D_DEBUG -lGL -lX11 -lXi -ldl -lasound -lm -lpthread
+
