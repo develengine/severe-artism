@@ -87,6 +87,23 @@ void gui_draw_rect(int x, int y, int w, int h, color_t color)
 }
 
 
+void gui_draw_text_n(const char *text, int n,
+                     int x, int y, int w, int h, int s, color_t color)
+{
+    for (int i = 0; i < n; ++i)
+        text_scratch[i] = text[i];
+
+    int word_count = n / 16 + (n % 16 != 0);
+
+    glProgramUniform2i(gui.text_program, 1, x, y);
+    glProgramUniform2i(gui.text_program, 2, w, h);
+    glProgramUniform2i(gui.text_program, 3, s, s);
+    glProgramUniform4fv(gui.text_program, 4, 1, color.data);
+    glProgramUniform4uiv(gui.text_program, 5, word_count, (unsigned *)text_scratch);
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, n);
+}
+
+
 void gui_draw_text(const char *text, int x, int y, int w, int h, int s, color_t color)
 {
     int text_len = 0;

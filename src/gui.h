@@ -45,6 +45,8 @@ void gui_use_image(unsigned texture);
 
 void gui_draw_rect(int x, int y, int w, int h, color_t color);
 void gui_draw_text(const char *text, int x, int y, int w, int h, int s, color_t color);
+void gui_draw_text_n(const char *text, int n,
+                     int x, int y, int w, int h, int s, color_t color);
 void gui_draw_image_colored(int x, int y, int w, int h,
                             float tx, float ty, float tw, float th,
                             color_t color);

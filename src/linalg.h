@@ -168,6 +168,11 @@ typedef union
     float data[2];
 } vec2_t;
 
+typedef union
+{
+    struct { int x, y; };
+    int data[2];
+} ivec2_t;
 
 typedef union
 {
