@@ -249,10 +249,10 @@ int bagE_main(int argc, char *argv[])
         glBindVertexArray(gui.dummy_vao);
 
         glUseProgram(test_program);
-
-        glProgramUniform2f(test_program, 0, -0.5f, 0.5f);
-        glProgramUniform2f(test_program, 1, 1.0f, 1.0f);
-        glProgramUniform1f(test_program, 2, time);
+        glProgramUniform2i(test_program, 0, 0, 0);
+        glProgramUniform2i(test_program, 1, window_width, window_height);
+        glProgramUniform2i(test_program, 2, window_width, window_height);
+        glProgramUniform1f(test_program, 3, time);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
 #if 0
