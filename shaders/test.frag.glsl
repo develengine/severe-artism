@@ -41,8 +41,6 @@ void main(void)
         light = sin(1.0 / (light * light * light * light) + t);
     }
 
-    // float light = min(o_coords.x, o_coords.y);
-
     out_color = vec4(vec3(light), 1.0);
 }
 
