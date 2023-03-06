@@ -49,25 +49,25 @@ DEFINE_GUID(based_IID_IAudioRenderClient,   0xF294ACFC, 0x3146, 0x4483, 0xA7, 0x
 
 static IMMDeviceEnumerator *enumerator = NULL;
 static IMMDevice *device = NULL;
-static IAudioClient *audioClient = NULL;
-static IAudioRenderClient *renderClient = NULL;
+static IAudioClient *audio_client = NULL;
+static IAudioRenderClient *render_client = NULL;
 
-static HANDLE audioThread;
-static DWORD audioThreadID;
+static HANDLE audio_thread;
+static DWORD audio_thread_id;
 
-static HANDLE callbackEvent;
+static HANDLE callback_event;
 
 static HANDLE task;
-static DWORD taskID;
+static DWORD task_id;
 
 
-DWORD WINAPI audioThreadFunction(void *param)
+DWORD WINAPI audio_thread_function(void *param)
 {
-    AudioWriteCallback writeCallback = ((AudioInfo*)param)->writeCallback;
+    audio_write_callback_t write_callback = ((audio_info_t*)param)->write_callback;
 
     HRESULT hr;
 
-    if (!SetThreadPriority(audioThread, THREAD_PRIORITY_HIGHEST))
+    if (!SetThreadPriority(audio_thread, THREAD_PRIORITY_HIGHEST))
         log("Failed to raise thread priority!\n");
 
     hr = CoInitializeEx(0, COINIT_SPEED_OVER_MEMORY);
@@ -95,9 +95,9 @@ DWORD WINAPI audioThreadFunction(void *param)
             &based_IID_IAudioClient,
             CLSCTX_ALL,
             NULL,
-            (void**)&audioClient
+            (void**)&audio_client
     );
-    kill_on_fail(hr, "Failed to activate device and create audioClient!");
+    kill_on_fail(hr, "Failed to activate device and create audio_client!");
 
     WAVEFORMATEXTENSIBLE format = {
         .Format = {
@@ -116,9 +116,9 @@ DWORD WINAPI audioThreadFunction(void *param)
 
     WAVEFORMATEX *closest;
 
-    REFERENCE_TIME requestedDuration = REFTIMES_PER_SEC / 8;
-    hr = audioClient->lpVtbl->IsFormatSupported(
-            audioClient,
+    REFERENCE_TIME requested_duration = REFTIMES_PER_SEC / 8;
+    hr = audio_client->lpVtbl->IsFormatSupported(
+            audio_client,
             AUDCLNT_SHAREMODE_SHARED,
             &format.Format,
             &closest
@@ -131,8 +131,8 @@ DWORD WINAPI audioThreadFunction(void *param)
         }
     }
 
-    hr = audioClient->lpVtbl->Initialize(
-            audioClient,
+    hr = audio_client->lpVtbl->Initialize(
+            audio_client,
             AUDCLNT_SHAREMODE_SHARED,
             // AUDCLNT_STREAMFLAGS_NOPERSIST  // not sure if this
             // |
@@ -140,106 +140,106 @@ DWORD WINAPI audioThreadFunction(void *param)
             // |
             // AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM  // may or may not be desirable
             ,
-            requestedDuration,
+            requested_duration,
             0,
             &format.Format,
             NULL
     );
-    kill_on_fail(hr, "Failed to initialize audioClient!");
+    kill_on_fail(hr, "Failed to initialize audio_client!");
 
-    unsigned bufferFrameCount;
-    hr = audioClient->lpVtbl->GetBufferSize(audioClient, &bufferFrameCount);
+    unsigned buffer_frame_count;
+    hr = audio_client->lpVtbl->GetBufferSize(audio_client, &buffer_frame_count);
     kill_on_fail(hr, "Failed to get buffer size ?!?!!");
 
-    printf("obfc(ns): %lld, nbfc(smp): %d\n", requestedDuration, bufferFrameCount);
+    printf("obfc(ns): %lld, nbfc(smp): %d\n", requested_duration, buffer_frame_count);
 
-    callbackEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-    if (callbackEvent == NULL) {
-        fprintf(stderr, "Failed to create callbackEvent!\n");
+    callback_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (callback_event == NULL) {
+        fprintf(stderr, "Failed to create callback_event!\n");
         exit(1);
     }
 
-    hr = audioClient->lpVtbl->SetEventHandle(audioClient, callbackEvent);
-    kill_on_fail(hr, "Failed to set callbackEvent!\n");
+    hr = audio_client->lpVtbl->SetEventHandle(audio_client, callback_event);
+    kill_on_fail(hr, "Failed to set callback_event!\n");
 
-    hr = audioClient->lpVtbl->GetService(
-            audioClient,
+    hr = audio_client->lpVtbl->GetService(
+            audio_client,
             &based_IID_IAudioRenderClient,
-            (void**)&renderClient
+            (void**)&render_client
     );
-    kill_on_fail(hr, "Failed to retrieve renderClient!");
+    kill_on_fail(hr, "Failed to retrieve render_client!");
 
 #if 0
-    int16_t *sampleBuffer = malloc(bufferFrameCount * 2 * sizeof(int16_t));
+    int16_t *sampleBuffer = malloc(buffer_frame_count * 2 * sizeof(int16_t));
     malloc_check(sampleBuffer);
-    bufferData(sampleBuffer, bufferFrameCount);
+    bufferData(sampleBuffer, buffer_frame_count);
 #endif
 
-    int16_t *destBuffer;
+    int16_t *dest_buffer;
 
-    hr = renderClient->lpVtbl->GetBuffer(renderClient, bufferFrameCount, (BYTE**)&destBuffer);
+    hr = render_client->lpVtbl->GetBuffer(render_client, buffer_frame_count, (BYTE**)&dest_buffer);
     log_on_fail(hr, "Failed to get buffer!");
 
     if (SUCCEEDED(hr)) {
-        writeCallback(destBuffer, bufferFrameCount);
+        write_callback(dest_buffer, buffer_frame_count);
 
-        hr = renderClient->lpVtbl->ReleaseBuffer(renderClient, bufferFrameCount, 0);
+        hr = render_client->lpVtbl->ReleaseBuffer(render_client, buffer_frame_count, 0);
         log_on_fail(hr, "Failed to release buffer!");
     }
 
 #if 0
-    task = AvSetMmThreadCharacteristics(TEXT("Pro Audio"), &taskID);
+    task = AvSetMmThreadCharacteristics(TEXT("Pro Audio"), &task_id);
     if (task == NULL) {
         fprintf(stderr, "Failed to set mm thread characteristics!\n");
         exit(1);
     }
 #endif
 
-    hr = audioClient->lpVtbl->Start(audioClient);
+    hr = audio_client->lpVtbl->Start(audio_client);
     kill_on_fail(hr, "Failed to audio client!\n");
 
     for (;;) {
-        if (WaitForSingleObject(callbackEvent, 2000) != WAIT_OBJECT_0)
+        if (WaitForSingleObject(callback_event, 2000) != WAIT_OBJECT_0)
             log("Possible timeout!\n");
 
         unsigned paddingFrames;
-        hr = audioClient->lpVtbl->GetCurrentPadding(audioClient, &paddingFrames);
+        hr = audio_client->lpVtbl->GetCurrentPadding(audio_client, &paddingFrames);
         log_on_fail(hr, "Failed to retrieve padding!\n");
 
-        unsigned framesToRender = bufferFrameCount - paddingFrames;
+        unsigned framesToRender = buffer_frame_count - paddingFrames;
 
-        if (SUCCEEDED(renderClient->lpVtbl->GetBuffer(renderClient, framesToRender, (BYTE**)&destBuffer))) {
-            writeCallback(destBuffer, framesToRender);
+        if (SUCCEEDED(render_client->lpVtbl->GetBuffer(render_client, framesToRender, (BYTE**)&dest_buffer))) {
+            write_callback(dest_buffer, framesToRender);
 
-            hr = renderClient->lpVtbl->ReleaseBuffer(renderClient, framesToRender, 0);
+            hr = render_client->lpVtbl->ReleaseBuffer(render_client, framesToRender, 0);
             log_on_fail(hr, "Failed to release buffer!");
         }
     }
 }
 
 
-static AudioInfo audioInfo;
+static audio_info_t audio_info;
 
-void initAudioEngine(AudioInfo info)
+void init_audio_engine(audio_info_t info)
 {
-    audioInfo = info;
-    audioThread = CreateThread(NULL, 0, audioThreadFunction, &audioInfo, 0, &audioThreadID);
-    if (!audioThread)
+    audio_info = info;
+    audio_thread = CreateThread(NULL, 0, audio_thread_function, &audio_info, 0, &audio_thread_id);
+    if (!audio_thread)
         log("Failed to create audio thread!\n");
 }
 
 
-void exitAudioEngine(void)
+void exit_audio_engine(void)
 {
-    audioClient->lpVtbl->Stop(audioClient);
+    audio_client->lpVtbl->Stop(audio_client);
 
-    renderClient->lpVtbl->Release(renderClient);
-    audioClient->lpVtbl->Release(audioClient);
+    render_client->lpVtbl->Release(render_client);
+    audio_client->lpVtbl->Release(audio_client);
     device->lpVtbl->Release(device);
     enumerator->lpVtbl->Release(enumerator);
 
-    CloseHandle(callbackEvent);
-    CloseHandle(audioThread);
+    CloseHandle(callback_event);
+    CloseHandle(audio_thread);
 
     CoUninitialize();
 }

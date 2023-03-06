@@ -1,3 +1,5 @@
 program
 obj_parser
 ascii_meta
+*.obj
+*.exe
