@@ -8,6 +8,7 @@ cc -std=c11 -pedantic -Wall -Wextra \
     -g -o program \
     src/linux/bag_x11.c src/linux/audio_alsa.c src/glad/gl.c \
     src/main.c src/utils.c src/res.c src/animation.c src/core.c src/audio.c src/gui.c \
+    src/art_text.c \
     -Isrc -Isrc/glad/include \
     -D_DEBUG -lGL -lX11 -lXi -ldl -lasound -lm -lpthread
 

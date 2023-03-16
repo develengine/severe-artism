@@ -111,24 +111,25 @@ do {                                                    \
 } while (0)
 
 /* arguments must be lvalues, except for `item` */
-#define queue_push(type, queue, capacity, start, end, item)                             \
+#define queue_push(queue, capacity, start, end, item)                             \
 do {                                                                                    \
     queue[end] = item;                                                                  \
     if (++(end) == (capacity))                                                          \
         end = 0;                                                                        \
     if ((end) == (start)) {                                                             \
+        int type_size = sizeof(__typeof__(*(queue)));                                   \
         int new_capacity = (capacity) * 2;                                              \
-        type *new_ptr = realloc(queue, sizeof(type) * new_capacity);                    \
+        __typeof__(queue) new_ptr = realloc(queue, type_size * new_capacity);           \
         if (!new_ptr) {                                                                 \
-            new_ptr = malloc(sizeof(type) * new_capacity);                              \
+            new_ptr = malloc(type_size * new_capacity);                                 \
             malloc_check(new_ptr);                                                      \
-            memcpy(new_ptr, (queue) + (end), sizeof(type) * ((capacity) - (end)));      \
-            memcpy(new_ptr + (capacity) - (end), queue, sizeof(type) * (end));          \
+            memcpy(new_ptr, (queue) + (end), type_size * ((capacity) - (end)));         \
+            memcpy(new_ptr + (capacity) - (end), queue, type_size * (end));             \
             free(queue);                                                                \
             start = 0;                                                                  \
             end = capacity;                                                             \
         } else {                                                                        \
-            memcpy(new_ptr + (capacity), new_ptr, sizeof(type) * (end));                \
+            memcpy(new_ptr + (capacity), new_ptr, type_size * (end));                   \
             end = (capacity) + (end);                                                   \
         }                                                                               \
         capacity = new_capacity;                                                        \
