@@ -87,11 +87,14 @@ int bagE_main(int argc, char *argv[])
     init_audio();
     init_gui();
 
-    art_text_ctx_t art_text_ctx;
-    art_text_init(&art_text_ctx);
+    // art_text_ctx_t art_text_ctx;
+    // art_text_init(&art_text_ctx);
 
-    unsigned test_program = load_program("shaders/test.vert.glsl",
-                                         "shaders/test.frag.glsl");
+    // unsigned test_program = load_program("shaders/test.vert.glsl",
+                                         // "shaders/test.frag.glsl");
+
+    unsigned ref_program = load_program("shaders/ref.vert.glsl",
+                                        "shaders/ref.frag.glsl");
 
     float time = 0.0f;
 
@@ -101,7 +104,7 @@ int bagE_main(int argc, char *argv[])
         if (!running)
             break;
 
-        art_text_update(&art_text_ctx);
+        // art_text_update(&art_text_ctx);
 
         /* rendering */
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
@@ -114,6 +117,7 @@ int bagE_main(int argc, char *argv[])
         gui_update_resolution(window_width, window_height);
         glBindVertexArray(gui.dummy_vao);
 
+#if 1
 #if 0
         glUseProgram(test_program);
         glProgramUniform2i(test_program, 0, 0, 0);
@@ -121,6 +125,16 @@ int bagE_main(int argc, char *argv[])
         glProgramUniform2i(test_program, 2, window_width, window_height);
         glProgramUniform1f(test_program, 3, time);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+#else
+        glUseProgram(ref_program);
+        glProgramUniform2i(ref_program, 0, 0, 0);
+        glProgramUniform2i(ref_program, 1, window_width, window_height);
+        glProgramUniform2i(ref_program, 2, window_width, window_height);
+        glProgramUniform1f(ref_program, 3, time);
+        glProgramUniform1f(ref_program, 4, 90.0f);
+        glProgramUniform3f(ref_program, 5, 0.0f, 0.0f, 0.0f);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+#endif
 #else
         art_text_render(&art_text_ctx, window_width, window_height);
 #endif
@@ -130,7 +144,7 @@ int bagE_main(int argc, char *argv[])
         bagE_swapBuffers();
     }
   
-    art_text_free(&art_text_ctx);
+    // art_text_free(&art_text_ctx);
 
     exit_audio(); /* NOTE: exit audio before all the sound buffers get freed */
     exit_gui();
