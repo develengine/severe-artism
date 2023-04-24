@@ -10,6 +10,9 @@
 
 #include "art_text.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -46,6 +49,125 @@
  *   - Procedural shader generator?
  */
 
+#define EPS 0.001
+#define END 100.0
+
+
+typedef struct
+{
+    uint8_t r, g, b, a;
+} pixel_t;
+
+
+static inline float capsule_sdf(vec3_t x, float mn, float mx, float r)
+{
+    vec3_t d = (vec3_t) {{ 0.0, clamp(x.y, mn, mx), 0.0 }};
+    return vec3_length(vec3_sub(x, d)) - r;
+}
+
+static inline float tree_sdf(vec3_t x)
+{
+    float dist = capsule_sdf(x, 0.0f, 0.5f, 0.1f);
+
+    for (int i = 0; i < 5; ++i) {
+        x.y -= 0.5f;
+
+        float ud = 0.7f;
+        float u = x.x < 0.0 ? -0.3f : 0.3f;
+
+        float su = sinf(u);
+        float cu = cosf(u);
+
+        float sud = sinf(ud);
+        float cud = cosf(ud);
+
+        x = (vec3_t) {{
+            x.x * cu - x.y * su,
+            x.x * su + x.y * cu,
+            x.z
+        }};
+
+        x = (vec3_t) {{
+            x.x * cud - x.z * sud,
+            x.y,
+            x.x * sud + x.z * cud
+        }};
+
+        float cd = capsule_sdf(x, 0.0f, 0.5f, 0.1f);
+        if (cd < dist)
+            dist = cd;
+    }
+
+    return dist;
+}
+
+static inline float sdf(vec3_t x)
+{
+    vec3_t c = {{ 0.0f, -1.5f, 2.5f }};
+    x = vec3_sub(x, c);
+
+    float t = 0.0f;
+
+    x = (vec3_t) {{
+        x.x * cosf(t) - x.z * sinf(t),
+        x.y,
+        x.x * sinf(t) + x.z * cosf(t)
+    }};
+
+    return tree_sdf(x);
+}
+
+static inline vec3_t get_normal(vec3_t p)
+{
+    return vec3_normalize((vec3_t) {{
+        sdf((vec3_t) {{ p.x + EPS, p.y, p.z }}) - sdf((vec3_t) {{ p.x - EPS, p.y, p.z }}),
+        sdf((vec3_t) {{ p.x, p.y + EPS, p.z }}) - sdf((vec3_t) {{ p.x, p.y - EPS, p.z }}),
+        sdf((vec3_t) {{ p.x, p.y, p.z + EPS }}) - sdf((vec3_t) {{ p.x, p.y, p.z - EPS }})
+    }});
+}
+
+void render_tree(pixel_t *buffer, int buffer_width, int buffer_height)
+{
+    for (int yi = 0; yi < buffer_height; ++yi) {
+        for (int xi = 0; xi < buffer_width; ++xi) {
+            float x = 2.0f * ((float)xi / buffer_width)  - 1.0f;
+            float y = 2.0f * ((float)yi / buffer_height) - 1.0f;
+
+            vec3_t ray_dir = {{ x, y * ((float)buffer_height / buffer_width), 1.0f }};
+            ray_dir = vec3_normalize(ray_dir);
+
+            float depth = 0.1f;
+            float dist;
+
+            vec3_t at = vec3_scale(ray_dir, depth);
+
+            for (int i = 0; i < 256; i++) {
+                dist = sdf(at);
+
+                depth += dist;
+
+                if (dist <= EPS)
+                    break;
+
+                at = vec3_add(at, vec3_scale(ray_dir, dist));
+
+                if (depth >= END) {
+                    break;
+                }
+            }
+
+            vec3_t light_vec = {{ 1.0f, 1.0f, -1.0f }};
+
+            vec3_t p = at;
+            vec3_t n = get_normal(p);
+        }
+    }
+}
+
+void render_cpu(void)
+{
+    
+}
 
 
 bool running = true;
@@ -56,6 +178,7 @@ int window_height = 720;
 bool f11_down   = false;
 bool fullscreen = false;
 
+bool flow_time = true;
 
 int bagE_main(int argc, char *argv[])
 {
@@ -67,7 +190,6 @@ int bagE_main(int argc, char *argv[])
     print_context_info();
 
     bagE_setWindowTitle("severe artism");
-
 
     // TODO: when interpolation is needed this should be removed
     bagE_setSwapInterval(1);
@@ -83,6 +205,8 @@ int bagE_main(int argc, char *argv[])
     // glEnable(GL_FRAMEBUFFER_SRGB);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    render_cpu();
 
     init_audio();
     init_gui();
@@ -139,7 +263,8 @@ int bagE_main(int argc, char *argv[])
         art_text_render(&art_text_ctx, window_width, window_height);
 #endif
 
-        time += 0.01666f;
+        if (flow_time)
+            time += 0.01666f;
 
         bagE_swapBuffers();
     }
@@ -187,6 +312,12 @@ int bagE_eventHandler(bagE_Event *event)
                     } else {
                         f11_down = false;
                     }
+                    break;
+
+                case KEY_P:
+                    if (down)
+                        break;
+                    flow_time = !flow_time;
                     break;
             }
         } break;

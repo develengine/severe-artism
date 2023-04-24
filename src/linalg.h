@@ -161,6 +161,48 @@ typedef union
     float data[3];
 } vec3_t;
 
+static inline vec3_t vec3_add(vec3_t a, vec3_t b)
+{
+    return (vec3_t) {{
+        a.x + b.x,
+        a.y + b.y,
+        a.z + b.z,
+    }};
+}
+
+static inline vec3_t vec3_sub(vec3_t a, vec3_t b)
+{
+    return (vec3_t) {{
+        a.x - b.x,
+        a.y - b.y,
+        a.z - b.z,
+    }};
+}
+
+static inline vec3_t vec3_scale(vec3_t a, float s)
+{
+    return (vec3_t) {{
+        a.x * s,
+        a.y * s,
+        a.z * s,
+    }};
+}
+
+static inline float vec3_length(vec3_t v)
+{
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+static inline vec3_t vec3_normalize(vec3_t v)
+{
+    float len = vec3_length(v);
+    return (vec3_t) {{
+        v.x / len,
+        v.y / len,
+        v.z / len,
+    }};
+}
+
 
 typedef union
 {
@@ -263,11 +305,17 @@ static inline float dot(float a[3], float b[3])
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-
+// FIXME: Make it vec3
 static inline float vec_len(float a[3])
 {
     return sqrtf(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
 }
 
+static inline float clamp(float x, float mn, float mx)
+{
+    if (x < mn) return mn;
+    if (x > mx) return mx;
+    return x;
+}
 
 #endif
