@@ -5,12 +5,14 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>
 
 
 #define IMAGE_WIDTH  1920
 #define IMAGE_HEIGHT 1080
 
 #define to_screen(x, y) { x * IMAGE_WIDTH, y * IMAGE_HEIGHT }
+#define to_vec(x, y)    { x * (IMAGE_WIDTH / 2), -y * (IMAGE_HEIGHT / 2) }
 
 typedef struct
 {
@@ -38,6 +40,51 @@ static inline vec2_t vec2_add(vec2_t a, vec2_t b)
     return (vec2_t) { a.x + b.x, a.y + b.y };
 }
 
+static inline vec2_t vec2_sub(vec2_t a, vec2_t b)
+{
+    return (vec2_t) { a.x - b.x, a.y - b.y };
+}
+
+static inline float vec2_length(vec2_t v)
+{
+    return sqrtf(v.x * v.x + v.y * v.y);
+}
+
+static inline vec2_t vec2_normalize(vec2_t v)
+{
+    float l = vec2_length(v);
+
+    return (vec2_t) { v.x / l,
+                      v.y / l };
+}
+
+static inline vec2_t vec2_cmul(vec2_t a, vec2_t b)
+{
+    return (vec2_t) { a.x * b.x - a.y * b.y,
+                      a.x * b.y + a.y * b.x };
+}
+
+static inline vec2_t vec2_conj(vec2_t v)
+{
+    return (vec2_t) { v.x, -v.y };
+}
+
+static inline vec2_t vec2_from_angle(float x)
+{
+    return (vec2_t) { cosf(x), -sinf(x) };
+}
+
+static inline vec2_t vec2_project(vec2_t v)
+{
+    return (vec2_t) { (1.0f - (v.x * (IMAGE_HEIGHT / (float)IMAGE_WIDTH))) * (IMAGE_WIDTH  / 2),
+                      (1.0f - v.y) * (IMAGE_HEIGHT / 2) };
+}
+
+static inline vec2_t vec2_provect(vec2_t v)
+{
+    return (vec2_t) { v.x * (IMAGE_WIDTH  / (float)(2 * IMAGE_HEIGHT)),
+                     -v.y * (IMAGE_HEIGHT / 2) };
+}
 
 void plot_dot(image_t image, int x, int y, int d, pixel_t color)
 {
@@ -81,25 +128,38 @@ void plot_bezier(image_t image, vec2_t *points, int point_count, int samples, pi
     }
 }
 
-void render(image_t image)
-{
-    vec2_t left_p[] = {
-        to_screen(0.4f, 0.5f),
-        to_screen(0.35f, 1.0f),
-        to_screen(0.0f, 0.8f),
-        to_screen(0.1f, 1.3f),
-    };
+#define EDGE_POS to_screen(0.4f, 0.5f)
 
-    pixel_t color = { 30, 30, 30, 255 };
+static vec2_t left_p[] = {
+    EDGE_POS,
+    to_screen(0.35f, 1.0f),
+    to_screen(0.0f, 0.8f),
+    to_screen(0.1f, 1.3f),
+};
+
+static vec2_t left_h[] = {
+    EDGE_POS,
+    to_screen(0.3f, 0.2f),
+    to_screen(0.1f, 0.4f),
+    to_screen(-0.1f, 0.15f),
+};
+
+vec2_t right_p[4];
+
+vec2_t right_h[] = {
+    to_screen(0.00000, 0.00000),
+    to_screen(0.5, 0.3),
+    to_screen(0.7, 0.55),
+    to_screen(0.85, 0.2),
+    to_screen(1.1, 0.2),
+    to_screen(1.6, 0.2),
+};
+
+void render_terrain(image_t image)
+{
+    pixel_t color = { 200, 200, 200, 255 };
 
     plot_bezier(image, left_p, length(left_p), 2000, color);
-
-    vec2_t left_h[] = {
-        left_p[0],
-        to_screen(0.3f, 0.2f),
-        to_screen(0.1f, 0.4f),
-        to_screen(-0.1f, 0.15f),
-    };
 
     plot_bezier(image, left_h, length(left_h), 2000, color);
 
@@ -154,23 +214,14 @@ void render(image_t image)
         plot_bezier(image, ps, length(ps), 2000, color);
     }
 
-    vec2_t right_p[] = {
-        vec2_add(left_p[0], (vec2_t) to_screen(0.0125f, 0.03f)),
-        vec2_add(left_p[1], (vec2_t) to_screen(0.02f,   0.0f)),
-        vec2_add(left_p[2], (vec2_t) to_screen(0.08f,   0.0f)),
-        vec2_add(left_p[3], (vec2_t) to_screen(0.16f,   0.0f)),
-    };
+    right_p[0] = vec2_add(left_p[0], (vec2_t) to_screen(0.0125f, 0.03f));
+    right_p[1] = vec2_add(left_p[1], (vec2_t) to_screen(0.02f,   0.0f));
+    right_p[2] = vec2_add(left_p[2], (vec2_t) to_screen(0.08f,   0.0f));
+    right_p[3] = vec2_add(left_p[3], (vec2_t) to_screen(0.16f,   0.0f));
 
     plot_bezier(image, right_p, length(right_p), 2000, color);
 
-    vec2_t right_h[] = {
-        right_p[0],
-        to_screen(0.5, 0.3),
-        to_screen(0.7, 0.55),
-        to_screen(0.85, 0.2),
-        to_screen(1.1, 0.2),
-        to_screen(1.6, 0.2),
-    };
+    right_h[0] = right_p[0];
 
     plot_bezier(image, right_h, length(right_h), 2000, color);
 
@@ -237,6 +288,147 @@ void render(image_t image)
     }
 }
 
+vec2_t hermite(float t, vec2_t p0, vec2_t v0, vec2_t p1, vec2_t v1)
+{
+    float t2 = t * t;
+    float t3 = t2 * t;
+
+    return vec2_add(vec2_add(vec2_scale(p0, 2.0f * t3 - 3.0f * t2 + 1.0f),
+                             vec2_scale(v0, t3 - 2.0f * t2 + t)),
+                    vec2_add(vec2_scale(p1, -2.0f * t3 + 3 * t2),
+                             vec2_scale(v1, t3 - t2)));
+}
+
+void plot_hermite(image_t image,
+                  vec2_t *ps, vec2_t *vs, int count,
+                  int samples, pixel_t color, int size)
+{
+    for (int i = 0; i < samples; ++i) {
+        float t = (float)i / samples;
+        float scaled = t * (count - 1);
+        int index = (int)(scaled);
+
+        vec2_t p = hermite(scaled - index,
+                           ps[index],     vs[index],
+                           ps[index + 1], vs[index + 1]);
+
+        p = vec2_project(p);
+
+        plot_dot(image, (int)p.x, (int)p.y, size, color);
+    }
+}
+
+void plot_tree_rec(image_t image,
+                   vec2_t pos,
+                   vec2_t vec, vec2_t p_vec,
+                   vec2_t rot1, vec2_t rot2, vec2_t rot3,
+                   int depth)
+{
+    if (depth == 0)
+        return;
+
+    vec2_t n_pos = vec2_add(pos, vec);
+
+    vec2_t points[] = {
+        pos,
+        n_pos,
+    };
+
+    vec2_t vecs[] = {
+        p_vec,
+        vec,
+    };
+
+    vec2_t n_pos2 = hermite(0.6f, pos, p_vec, n_pos, vec);
+    vec2_t n_pos3 = hermite(0.9f, pos, p_vec, n_pos, vec);
+
+    pixel_t col = { 0, 0, 0, 255 };
+
+    plot_hermite(image, points, vecs, length(vecs), 500, col, depth * 2);
+
+    plot_tree_rec(image, n_pos,  vec2_cmul(vec, rot1), vec, rot1, rot2, rot3, depth - 1);
+    plot_tree_rec(image, n_pos3, vec2_cmul(vec, rot2), vec, rot1, rot2, rot3, depth - 1);
+    plot_tree_rec(image, n_pos2, vec2_cmul(vec, rot3), vec, rot1, rot2, rot3, depth - 1);
+}
+
+void plot_tree(image_t image)
+{
+    vec2_t v = { 0.0f, 0.35f };
+    vec2_t root = {-0.2f, 0.35f };
+
+    plot_tree_rec(image,
+        (vec2_t) {-0.6f,-0.9f },
+        v, root,
+        vec2_scale(vec2_from_angle(-0.5f), 0.9f),
+        vec2_scale(vec2_from_angle(0.3f),  0.9f),
+        vec2_scale(vec2_from_angle(0.55f),  0.9f),
+        7
+    );
+}
+
+void render_sky(image_t image)
+{
+    vec2_t mid = to_screen(0.0f, 0.56f);
+    mid.x = left_h[0].x;
+
+    mid.x += 4.5f;
+    mid.y += 50.0f;
+
+    pixel_t color = { 200, 200, 255, 255 };
+    // plot_dot(image, (int)mid.x, (int)mid.y, 20, color);
+
+    int iters = 196;
+
+    for (int i = 0; i < iters; ++i) {
+        vec2_t p1 = bezier((float)i / iters, 0, 0, left_h, length(left_h));
+
+        vec2_t ps[] = {
+            p1,
+            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), 600.0f)),
+        };
+
+        plot_bezier(image, ps, length(ps), 2000, color);
+    }
+
+    iters = 11;
+
+    vec2_t gap[] = {
+        left_h[0],
+        right_h[0],
+    };
+
+    for (int i = 0; i < iters; ++i) {
+        vec2_t p1 = bezier((float)i / iters, 0, 0, gap, length(gap));
+
+        vec2_t ps[] = {
+            p1,
+            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), 600.0f)),
+        };
+
+        plot_bezier(image, ps, length(ps), 2000, color);
+    }
+
+    iters = 196;
+
+    for (int i = 0; i < iters; ++i) {
+        vec2_t p1 = bezier((float)i / iters, 0, 0, right_h, length(right_h));
+
+        vec2_t ps[] = {
+            p1,
+            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), 1000.0f)),
+        };
+
+        plot_bezier(image, ps, length(ps), 2000, color);
+    }
+}
+
+void render(image_t image)
+{
+    render_terrain(image);
+    render_sky(image);
+    plot_tree(image);
+}
+
 int main(void)
 {
     pixel_t *pixels = malloc(sizeof(pixel_t) * IMAGE_WIDTH * IMAGE_HEIGHT);
@@ -245,7 +437,7 @@ int main(void)
     /* clear image */
     for (int y = 0; y < IMAGE_HEIGHT; ++y) {
         for (int x = 0; x < IMAGE_WIDTH; ++x) {
-            int c = (x + y) % 2 ? 200 : 150;
+            int c = (x + y) % 2 ? 100 : 150;
             pixels[x + y * IMAGE_WIDTH] = (pixel_t) { c, c, c, 255 };
         }
     }
