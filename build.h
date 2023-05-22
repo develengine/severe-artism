@@ -4,6 +4,7 @@
 /* TODO:
  * [ ] file writing and loading
  * [ ] csv timestamp file for auto updating
+ * [X] add windows support
  * */
 
 #ifndef COMMAND_BUFFER_SIZE
@@ -17,22 +18,55 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <errno.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <errno.h>
 
-#ifndef NO_DATA
+#ifndef _WIN32
+    #include <sys/wait.h>
+    #include <unistd.h>
+#else
+    #include <windows.h>
+#endif // _WIN32
 
-const char *nice_warnings[] = {
-    "all",
-    "extra",
-    "pedantic",
-    "no-deprecated-declarations",
-    "no-missing-field-initializers",
-    NULL
-};
+
+#define RELEASE_FLAG "2"
+
+#ifndef _WIN32
+    #define DEBUG_FLAG "g"
+#else
+    #define DEBUG_FLAG "d"
+#endif // _WIN32
+
+
+#ifndef BUILD_NO_DATA
+
+#ifndef _WIN32
+    const char *nice_warnings[] = {
+        "all",
+        "extra",
+        "pedantic",
+        NULL
+    };
+
+    const char *nice_warnings_off[] = {
+        "deprecated-declarations",
+        "missing-field-initializers",
+        NULL
+    };
+#else
+    const char *nice_warnings[] = {
+        "4",
+        NULL
+    };
+
+    const char *nice_warnings_off[] = {
+        "d5105",
+        "d4706",
+        "44062",
+        NULL
+    };
+#endif // _WIN32
 
 #endif // NO_DATA
 
@@ -51,7 +85,9 @@ typedef struct
     const char **defines;
     const char **libs;
     const char **warnings;
+    const char **warnings_off;
     const char **raw_params;
+
 } compile_info_t;
 
 static inline int buffer_append(char *buffer, int pos, const char *str)
@@ -73,6 +109,8 @@ static inline int buffer_append(char *buffer, int pos, const char *str)
 
     return pos + str_len;
 }
+
+#ifndef _WIN32
 
 static inline pid_t compile(compile_info_t info)
 {
@@ -145,6 +183,13 @@ static inline pid_t compile(compile_info_t info)
         }
     }
 
+    if (info.warnings_off) {
+        for (int i = 0; info.warnings_off[i]; ++i) {
+            pos = buffer_append(buffer, pos, " -Wno-");
+            pos = buffer_append(buffer, pos, info.warnings_off[i]);
+        }
+    }
+
     if (info.raw_params) {
         for (int i = 0; info.raw_params[i]; ++i) {
             pos = buffer_append(buffer, pos, " ");
@@ -190,12 +235,6 @@ static inline int wait_on_exits(pid_t *pids, int count)
     return 0;
 }
 
-static inline int compile_w(compile_info_t info)
-{
-    pid_t pid = compile(info);
-    return wait_on_exits(&pid, 1);
-}
-
 static inline pid_t execute_v(const char *fmt, va_list args)
 {
     /* construct command */
@@ -235,6 +274,209 @@ static inline pid_t execute_v(const char *fmt, va_list args)
     }
 
     return pid;
+}
+
+#else
+
+#define pid_t HANDLE
+
+
+static inline pid_t compile(compile_info_t info)
+{
+    /* construct command */
+
+    char buffer[COMMAND_BUFFER_SIZE] = {0};
+    int pos = 0;
+
+    pos = buffer_append(buffer, pos, "cmd.exe /c \"");
+
+    if (info.compiler) {
+        fprintf(stderr, "Compiler choice not yet implemented on windows!\n");
+    }
+
+    // NOTE: There mey be cases where these default flags may not be desired.
+    //       /nologo: Makes the compiler shut up for the most part.
+    //       /EHsc:   Doesn't generate stack unwinding code for c source code.
+    pos = buffer_append(buffer, pos, "cl /nologo /EHsc");
+
+    if (info.output) {
+        pos = buffer_append(buffer, pos, " /Fe");
+        pos = buffer_append(buffer, pos, info.output);
+    }
+
+    if (info.std) {
+        pos = buffer_append(buffer, pos, " /std:");
+        pos = buffer_append(buffer, pos, info.std);
+    }
+
+    if (info.optimisations) {
+        pos = buffer_append(buffer, pos, " /O");
+        pos = buffer_append(buffer, pos, info.optimisations);
+    }
+
+    if (info.pedantic) {
+        fprintf(stderr, "Pedantic is not available on windows!\n");
+    }
+
+    if (info.keep_source_info) {
+        // NOTE: Not sure if this is exactly analogous to '-g'.
+        pos = buffer_append(buffer, pos, " /DEBUG");
+    }
+
+    if (info.source_files) {
+        for (int i = 0; info.source_files[i]; ++i) {
+            pos = buffer_append(buffer, pos, " ");
+            pos = buffer_append(buffer, pos, info.source_files[i]);
+        }
+    }
+
+    if (info.includes) {
+        for (int i = 0; info.includes[i]; ++i) {
+            pos = buffer_append(buffer, pos, " /I");
+            pos = buffer_append(buffer, pos, info.includes[i]);
+        }
+    }
+
+    if (info.defines) {
+        for (int i = 0; info.defines[i]; ++i) {
+            pos = buffer_append(buffer, pos, " /D");
+            pos = buffer_append(buffer, pos, info.defines[i]);
+        }
+    }
+
+    if (info.libs) {
+        for (int i = 0; info.libs[i]; ++i) {
+            // NOTE: This is different on windows and may need to be re-thought.
+            pos = buffer_append(buffer, pos, " ");
+            pos = buffer_append(buffer, pos, info.libs[i]);
+        }
+    }
+
+    if (info.warnings) {
+        for (int i = 0; info.warnings[i]; ++i) {
+            pos = buffer_append(buffer, pos, " /W");
+            pos = buffer_append(buffer, pos, info.warnings[i]);
+        }
+    }
+
+    if (info.warnings_off) {
+        for (int i = 0; info.warnings_off[i]; ++i) {
+            pos = buffer_append(buffer, pos, " /w");
+            pos = buffer_append(buffer, pos, info.warnings_off[i]);
+        }
+    }
+
+    if (info.raw_params) {
+        for (int i = 0; info.raw_params[i]; ++i) {
+            pos = buffer_append(buffer, pos, " ");
+            pos = buffer_append(buffer, pos, info.raw_params[i]);
+        }
+    }
+
+    pos = buffer_append(buffer, pos, "\"");
+
+    /* execute command */
+
+    STARTUPINFO startup_info = {0};
+    startup_info.cb = sizeof(startup_info);
+
+    PROCESS_INFORMATION process_info = {0};
+
+    if (!CreateProcessA("C:\\Windows\\System32\\cmd.exe",
+                        buffer,
+                        NULL, NULL,
+                        FALSE,
+                        0,
+                        NULL, NULL,
+                        &startup_info,
+                        &process_info))
+    {
+        fprintf(stderr, "CreateProcessA(): (%d)\n", GetLastError());
+        exit(EXIT_FAILURE);
+    }
+
+    return process_info.hProcess;
+}
+
+static inline int wait_on_exits(pid_t *pids, int count)
+{
+    if (WaitForMultipleObjects(count, pids, TRUE, INFINITE) == WAIT_FAILED) {
+        fprintf(stderr, "WaitForMultipleObjects(): (%d)\n", GetLastError());
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < count; ++i) {
+        int code;
+
+        if (!GetExitCodeProcess(pids[i], &code)) {
+            fprintf(stderr, "GetExitCodeProcess(): (%d)\n", GetLastError());
+            exit(EXIT_FAILURE);
+        }
+
+        if (code)
+            return code;
+    }
+
+    return 0;
+}
+
+static inline pid_t execute_v(const char *fmt, va_list args)
+{
+    /* construct command */
+
+    char buffer[EXECUTE_BUFFER_SIZE] = {0};
+
+    int pos = buffer_append(buffer, 0, "cmd.exe /c \"");
+
+    char *buff = buffer + pos;
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+
+    int to_write = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+
+    int written = vsnprintf(buff, EXECUTE_BUFFER_SIZE - pos - 1, fmt, args_copy);
+    va_end(args_copy);
+
+    if (written != to_write) {
+        fprintf(stderr, "build: EXECUTE_BUFFER_SIZE '%d' too small!\n"
+                        "       Increase the value of the macro in file '%s'.\n",
+                        EXECUTE_BUFFER_SIZE, __FILE__);
+        exit(EXIT_FAILURE);
+    }
+
+    buff[written] = '\"';
+
+    /* execute command */
+
+    STARTUPINFO startup_info = {0};
+    startup_info.cb = sizeof(startup_info);
+
+    PROCESS_INFORMATION process_info = {0};
+
+    if (!CreateProcessA("C:\\Windows\\System32\\cmd.exe",
+                        buffer,
+                        NULL, NULL,
+                        FALSE,
+                        0,
+                        NULL, NULL,
+                        &startup_info,
+                        &process_info))
+    {
+        fprintf(stderr, "CreateProcessA(): (%d)\n", GetLastError());
+        exit(EXIT_FAILURE);
+    }
+
+    return process_info.hProcess;
+}
+
+#endif // _WIN32
+
+static inline int compile_w(compile_info_t info)
+{
+    pid_t pid = compile(info);
+    return wait_on_exits(&pid, 1);
 }
 
 static inline pid_t execute(const char *fmt, ...)

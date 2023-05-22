@@ -8,8 +8,8 @@
 #include <math.h>
 
 
-#define IMAGE_WIDTH  1920
-#define IMAGE_HEIGHT 1080
+#define IMAGE_WIDTH  (1920 * 1)
+#define IMAGE_HEIGHT (1080 * 1)
 
 #define to_screen(x, y) { x * IMAGE_WIDTH, y * IMAGE_HEIGHT }
 #define to_vec(x, y)    { x * (IMAGE_WIDTH / 2), -y * (IMAGE_HEIGHT / 2) }
@@ -18,6 +18,74 @@ typedef struct
 {
     uint8_t r, g, b, a;
 } pixel_t;
+
+static inline pixel_t pixel_blend(pixel_t p1, pixel_t p2, float t1)
+{
+    float r1 = p1.r * t1;
+    float g1 = p1.g * t1;
+    float b1 = p1.b * t1;
+    float a1 = p1.a * t1;
+
+    float t2 = 1.0f - t1;
+
+    float r2 = p2.r * t2;
+    float g2 = p2.g * t2;
+    float b2 = p2.b * t2;
+    float a2 = p2.a * t2;
+
+    return (pixel_t) {
+        .r = (uint8_t)(r1 + r2),
+        .g = (uint8_t)(g1 + g2),
+        .b = (uint8_t)(b1 + b2),
+        .a = (uint8_t)(a1 + a2),
+    };
+}
+
+
+typedef struct
+{
+    float pos;
+    pixel_t color;
+} color_point_t;
+
+#define MAX_COLOR_POINTS 8
+
+typedef struct
+{
+    int count;
+    color_point_t points[MAX_COLOR_POINTS];
+} gradient_t;
+
+static inline pixel_t gradient_sample(gradient_t *gradient, float p)
+{
+    int i = 0;
+    color_point_t point;
+
+    for (; i < gradient->count; ++i) {
+        point = gradient->points[i];
+
+        if (point.pos >= p)
+            break;
+    }
+
+    int i_2 = i - 1;
+    if (i_2 < 0)
+        i_2 = 0;
+
+    if (i == gradient->count)
+        --i;
+
+    if (i == i_2)
+        return point.color;
+
+    color_point_t point_2 = gradient->points[i_2];
+
+    float length = point.pos - point_2.pos;
+    float p_rel  = p         - point_2.pos;
+
+    return pixel_blend(point.color, point_2.color, p_rel / length);
+}
+
 
 typedef struct
 {
@@ -86,7 +154,7 @@ static inline vec2_t vec2_provect(vec2_t v)
                      -v.y * (IMAGE_HEIGHT / 2) };
 }
 
-void plot_dot(image_t image, int x, int y, int d, pixel_t color)
+void plot_dot(image_t image, int x, int y, int d, pixel_t source)
 {
     int start_x = x - d / 2;
     if (start_x < 0) start_x = 0;
@@ -105,7 +173,8 @@ void plot_dot(image_t image, int x, int y, int d, pixel_t color)
             int dx = xi - x;
             int dy = yi - y;
             if (dx * dx + dy * dy < d * d / 4) {
-                image.pixels[xi + yi * image.width] = color;
+                pixel_t dest = image.pixels[xi + yi * image.width];
+                image.pixels[xi + yi * image.width] = pixel_blend(source, dest, source.a / 255.0f);
             }
         }
     }
@@ -120,11 +189,14 @@ vec2_t bezier(float t, int off, int depth, vec2_t *points, int point_count)
                     vec2_scale(bezier(t, off + 1, depth + 1, points, point_count), t));
 }
 
-void plot_bezier(image_t image, vec2_t *points, int point_count, int samples, pixel_t color)
+void plot_bezier(image_t image,
+                 vec2_t *points, int point_count,
+                 int samples, gradient_t *gradient)
 {
     for (int i = 0; i < samples; ++i) {
-        vec2_t p = bezier((float)i / samples, 0, 0, points, point_count);
-        plot_dot(image, (int)p.x, (int)p.y, 3, color);
+        float t = (float)i / samples;
+        vec2_t p = bezier(t, 0, 0, points, point_count);
+        plot_dot(image, (int)p.x, (int)p.y, 3, gradient_sample(gradient, t));
     }
 }
 
@@ -155,10 +227,48 @@ vec2_t right_h[] = {
     to_screen(1.6, 0.2),
 };
 
+gradient_t grad = {
+    .count  = 2,
+    .points = {
+        { 0.0f, { 25,   25, 125, 255 } },
+        { 1.0f, { 255, 150, 0,   255 } },
+    }
+};
+gradient_t *color = &grad;
+
+gradient_t grad_rev = {
+    .count  = 2,
+    .points = {
+        { 0.0f, { 255, 150, 0,   255 } },
+        { 1.0f, { 25,   25, 125, 255 } },
+    }
+};
+gradient_t *color_rev = &grad_rev;
+
+gradient_t sky_grad = {
+    .count  = 2,
+    .points = {
+        // { 0.0f, { 255, 150, 0,   255 } },
+        { 0.0f, { 255, 255, 255,   255 } },
+        { 1.0f, { 25,   25, 125, 255 } },
+    }
+};
+gradient_t *color_sky = &sky_grad;
+
+gradient_t path_grad = {
+    .count  = 3,
+    .points = {
+        { 0.0f, { 255, 255, 255,   255 } },
+        // { 0.5f, { 25,   25, 125, 255 } },
+        { 0.5f, { 255, 150, 0,   255 } },
+        { 1.0f, { 25,   25, 125, 255 } },
+    }
+};
+gradient_t *color_path = &path_grad;
+
+
 void render_terrain(image_t image)
 {
-    pixel_t color = { 200, 200, 200, 255 };
-
     plot_bezier(image, left_p, length(left_p), 2000, color);
 
     plot_bezier(image, left_h, length(left_h), 2000, color);
@@ -211,7 +321,7 @@ void render_terrain(image_t image)
             bezier((float)i / iters, 0, 0, p3, length(p3)),
         };
 
-        plot_bezier(image, ps, length(ps), 2000, color);
+        plot_bezier(image, ps, length(ps), 2000, color_rev);
     }
 
     right_p[0] = vec2_add(left_p[0], (vec2_t) to_screen(0.0125f, 0.03f));
@@ -250,7 +360,7 @@ void render_terrain(image_t image)
             bezier((float)i / iters, 0, 0, p3, length(p3)),
         };
 
-        plot_bezier(image, ps, length(ps), 2000, color);
+        plot_bezier(image, ps, length(ps), 2000, color_rev);
     }
 
     iters = 64;
@@ -285,6 +395,23 @@ void render_terrain(image_t image)
         };
 
         plot_bezier(image, ps, length(ps), 2000, color);
+    }
+}
+
+void render_path(image_t image)
+{
+    int iters = 12;
+
+    for (int i = 0; i < iters; ++i) {
+        vec2_t points[length(left_p)];
+
+        for (int p = 0; p < length(points); ++p) {
+            vec2_t two[] = { left_p[p], right_p[p] };
+
+            points[p] = bezier((float)i / iters, 0, 0, two, length(two));
+        }
+
+        plot_bezier(image, points, length(points), 2000, color_path);
     }
 }
 
@@ -374,8 +501,7 @@ void render_sky(image_t image)
     mid.x += 4.5f;
     mid.y += 50.0f;
 
-    pixel_t color = { 200, 200, 255, 255 };
-    // plot_dot(image, (int)mid.x, (int)mid.y, 20, color);
+    float len = 1000.0f;
 
     int iters = 196;
 
@@ -384,10 +510,10 @@ void render_sky(image_t image)
 
         vec2_t ps[] = {
             p1,
-            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), 600.0f)),
+            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), len)),
         };
 
-        plot_bezier(image, ps, length(ps), 2000, color);
+        plot_bezier(image, ps, length(ps), 2000, color_sky);
     }
 
     iters = 11;
@@ -402,10 +528,10 @@ void render_sky(image_t image)
 
         vec2_t ps[] = {
             p1,
-            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), 600.0f)),
+            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), len)),
         };
 
-        plot_bezier(image, ps, length(ps), 2000, color);
+        plot_bezier(image, ps, length(ps), 2000, color_sky);
     }
 
     iters = 196;
@@ -415,10 +541,10 @@ void render_sky(image_t image)
 
         vec2_t ps[] = {
             p1,
-            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), 1000.0f)),
+            vec2_add(p1, vec2_scale(vec2_normalize(vec2_sub(p1, mid)), len)),
         };
 
-        plot_bezier(image, ps, length(ps), 2000, color);
+        plot_bezier(image, ps, length(ps), 2000, color_sky);
     }
 }
 
@@ -426,6 +552,7 @@ void render(image_t image)
 {
     render_terrain(image);
     render_sky(image);
+    render_path(image);
     plot_tree(image);
 }
 
@@ -437,8 +564,9 @@ int main(void)
     /* clear image */
     for (int y = 0; y < IMAGE_HEIGHT; ++y) {
         for (int x = 0; x < IMAGE_WIDTH; ++x) {
-            int c = (x + y) % 2 ? 100 : 150;
-            pixels[x + y * IMAGE_WIDTH] = (pixel_t) { c, c, c, 255 };
+            // int c = (x + y) % 2 ? 100 : 150;
+            // pixels[x + y * IMAGE_WIDTH] = (pixel_t) { c, c, c, 255 };
+            pixels[x + y * IMAGE_WIDTH] = (pixel_t) { 50, 50, 50, 255 };
         }
     }
 

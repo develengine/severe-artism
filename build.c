@@ -5,7 +5,12 @@
 const char *output = "program";
 
 const char *source_files[] = {
+#ifndef _WIN32
     "src/linux/bag_x11.c",
+#else
+    "src/windows/bag_win32.c",
+#endif
+
     "src/glad/gl.c",
 
     "src/main.c",
@@ -24,16 +29,28 @@ const char *includes[] = {
 };
 
 const char *defines[] = {
+#ifndef _WIN32
     "_POSIX_C_SOURCE=200809L",
+#else
+    "_CRT_SECURE_NO_WARNINGS",
+#endif
     NULL
 };
 
 const char *libs[] = {
+#ifndef _WIN32
     "GL",
     "X11",
     "Xi",
     "dl",
     "m",
+#else
+    "User32.lib",
+    "Gdi32.lib",
+    "Opengl32.lib",
+    "Ole32.lib",
+    "ksuser.lib",
+#endif
     NULL
 };
 
@@ -45,7 +62,9 @@ const char *debug_defines[] = {
 };
 
 const char *debug_raw[] = {
+#ifndef _WIN32
     "-fno-omit-frame-pointer",
+#endif
     NULL
 };
 
@@ -57,7 +76,7 @@ int main(int argc, char *argv[])
     int res = compile_w((compile_info_t) {
         .output = output,
         .std = "c11",
-        .optimisations = debug ? "g" : "2",
+        .optimisations = debug ? DEBUG_FLAG : RELEASE_FLAG,
 
         .source_files = source_files,
         .includes = includes,
@@ -65,6 +84,9 @@ int main(int argc, char *argv[])
                          : defines,
         .libs = libs,
         .raw_params = debug ? debug_raw : NULL,
+
+        .warnings = nice_warnings,
+        .warnings_off = nice_warnings_off,
     });
 
     if (res)
@@ -72,7 +94,11 @@ int main(int argc, char *argv[])
 
     if (contains("run", argc, argv)) {
         printf("./%s:\n", output);
+#ifndef _WIN32
         return execute_w("./%s", output);
+#else
+        return execute_w("%s.exe", output);
+#endif
     }
 
     return 0;
