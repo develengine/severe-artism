@@ -71,11 +71,16 @@ const char *debug_raw[] = {
 
 int main(int argc, char *argv[])
 {
+    const char *build_files[] = { "build.c", NULL };
+    int res = try_rebuild_self(build_files, argc, argv);
+    if (res != -1)
+        return res;
+
     int debug = contains("debug", argc, argv);
 
-    int res = compile_w((compile_info_t) {
+    res = compile_w((compile_info_t) {
         .output = output,
-        .std = "c11",
+        .std = "c17",
         .optimisations = debug ? DEBUG_FLAG : RELEASE_FLAG,
 
         .source_files = source_files,
@@ -103,3 +108,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
