@@ -54,10 +54,9 @@ int bagE_main(int argc, char *argv[])
 
     init_gui();
 
-    unsigned ref_program = load_program("shaders/ref.vert.glsl",
-                                        "shaders/ref.frag.glsl");
-
     float time = 0.0f;
+
+    bagE_setCursor(-1);
 
     while (running) {
         bagE_pollEvents();
@@ -76,14 +75,13 @@ int bagE_main(int argc, char *argv[])
         gui_update_resolution(window_width, window_height);
         glBindVertexArray(gui.dummy_vao);
 
-        glUseProgram(ref_program);
-        glProgramUniform2i(ref_program, 0, 0, 0);
-        glProgramUniform2i(ref_program, 1, window_width, window_height);
-        glProgramUniform2i(ref_program, 2, window_width, window_height);
-        glProgramUniform1f(ref_program, 3, time);
-        glProgramUniform1f(ref_program, 4, 90.0f);
-        glProgramUniform3f(ref_program, 5, 0.0f, 0.0f, 0.0f);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        const char *text = "I like killing animals with my machetay.";
+
+        gui_begin_rect();
+        gui_draw_rect(0, 0, window_width, 24, (color_t) {{ 0.2f, 0.2f, 0.2f, 0.7f }});
+
+        gui_begin_text();
+        gui_draw_text(text, 0, 4, 8, 16, 0, (color_t) {{ 1.0f, 1.0f, 1.0f, 1.0f }});
 
         if (flow_time)
             time += 0.01666f;

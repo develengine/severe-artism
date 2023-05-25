@@ -44,6 +44,19 @@ typedef enum
     bagE_EventTypeCount
 } bagE_EventType;
 
+typedef enum
+{
+    bagE_CursorDefault,
+    bagE_CursorHandPoint,
+    bagE_CursorMoveAll,
+    bagE_CursorMoveHori,
+    bagE_CursorMoveVert,
+    bagE_CursorWait,
+    bagE_CursorWrite,
+    bagE_CursorCross,
+
+    bagE_CursorCount
+} bagE_Cursor;
 
 typedef struct
 {
@@ -121,6 +134,7 @@ void bagE_setFullscreen(int value);
 void bagE_setWindowTitle(char *value);
 void bagE_setSwapInterval(int value);
 void bagE_setCursorPosition(int x, int y);
+void bagE_setCursor(bagE_Cursor cursor);
 
 /* User defined */
 int bagE_eventHandler(bagE_Event *event);

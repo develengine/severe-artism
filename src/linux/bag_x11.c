@@ -4,6 +4,7 @@
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 #include <X11/extensions/XInput2.h>
+#include <X11/cursorfont.h>
 
 #include <GL/glx.h>
 
@@ -752,5 +753,28 @@ int bagE_setHiddenCursor(int value)
     }
 
     return 1;
+}
+
+static inline int bagE_convertCursor(bagE_Cursor cursor)
+{
+    switch (cursor) {
+        case bagE_CursorDefault:   return XC_arrow;
+        case bagE_CursorHandPoint: return XC_hand1;
+        case bagE_CursorMoveAll:   return XC_fleur;
+        case bagE_CursorMoveHori:  return XC_sb_h_double_arrow;
+        case bagE_CursorMoveVert:  return XC_sb_v_double_arrow;
+        case bagE_CursorWait:      return XC_watch;
+        case bagE_CursorWrite:     return XC_xterm;
+        case bagE_CursorCross:     return XC_cross;
+
+        default: return -1;
+    }
+}
+
+void bagE_setCursor(bagE_Cursor cursor)
+{
+    int id = bagE_convertCursor(cursor);
+    Cursor c = id < 0 ? None : XCreateFontCursor(bagX11.display, id);
+    XDefineCursor(bagX11.display, bagX11.window, c);
 }
 
