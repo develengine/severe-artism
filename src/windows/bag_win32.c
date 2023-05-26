@@ -98,6 +98,8 @@ static struct bagWIN32_Program
     int highSurrogate;
     HANDLE stdoutHandle;
     DWORD outModeOld;
+    HCURSOR cursor;
+    int cursorInClient;
 } bagWIN32;
 
 typedef struct bagWIN32_Program bagWIN32_Program;
@@ -204,7 +206,7 @@ int WinMain(
 #endif
     setlocale(LC_CTYPE, ""); // NOTE: Might need to be LC_ALL
     bagWIN32.openglLoaded = 0;
-
+    bagWIN32.cursor = LoadCursorA(NULL, IDC_ARROW);
 
     /* WIN32 */
 
@@ -273,6 +275,17 @@ int WinMain(
         exit(-1);
     }
 
+
+    TRACKMOUSEEVENT trackMouseEvent = {0};
+    trackMouseEvent.cbSize = sizeof(trackMouseEvent);
+    trackMouseEvent.dwFlags = TME_LEAVE;
+    trackMouseEvent.hwndTrack = bagWIN32.window;
+    trackMouseEvent.dwHoverTime = HOVER_DEFAULT;
+
+    if (!TrackMouseEvent(&trackMouseEvent)) {
+        bagWIN32_error("Failed start tracking the mouse events!");
+        exit(-1);
+    }
 
     /* WGL context creation */
 
@@ -404,6 +417,12 @@ int bagWIN32_utf8FromCodePoint(unsigned int codePoint, unsigned char string[]) {
 }
 
 
+static void bagWIN32_updateCursor(void)
+{
+    SetCursor(bagWIN32.cursor);
+}
+
+
 LRESULT CALLBACK bagWIN32_windowProc(
         HWND windowHandle,
         UINT message,
@@ -457,11 +476,28 @@ LRESULT CALLBACK bagWIN32_windowProc(
             event->data.key.repeat = lParam & 0xFF;
         } break;
 
-        case WM_MOUSEMOVE:
+        case WM_MOUSEMOVE: {
             event->type = bagE_EventMousePosition;
             event->data.mouse.x = (signed short)(lParam & 0xFFFF);
             event->data.mouse.y = (signed short)(lParam >> 16);
-            break;
+
+            if (!bagWIN32.cursorInClient) {
+                bagWIN32.cursorInClient = 1;
+
+                bagWIN32_updateCursor();
+
+                TRACKMOUSEEVENT trackMouseEvent = {0};
+                trackMouseEvent.cbSize = sizeof(trackMouseEvent);
+                trackMouseEvent.dwFlags = TME_LEAVE;
+                trackMouseEvent.hwndTrack = bagWIN32.window;
+                trackMouseEvent.dwHoverTime = HOVER_DEFAULT;
+
+                if (!TrackMouseEvent(&trackMouseEvent)) {
+                    bagWIN32_error("Failed start tracking the mouse events!");
+                    exit(-1);
+                }
+            }
+        } break;
 
         case WM_LBUTTONUP:
             event->data.mouseButton.button = bagE_ButtonLeft;
@@ -561,6 +597,10 @@ LRESULT CALLBACK bagWIN32_windowProc(
             events[1].type = bagE_EventTextUTF8;
             int length = bagWIN32_utf8FromCodePoint(utfVal, events[1].data.textUTF8.text);
             events[1].data.textUTF8.text[length] = 0;
+        } break;
+
+        case WM_MOUSELEAVE: {
+            bagWIN32.cursorInClient = 0;
         } break;
 
         default:
@@ -744,3 +784,29 @@ void bagE_setSwapInterval(int value)
     if (bagWIN32.newContext)
         wglSwapIntervalEXT(value);
 }
+
+static inline LPSTR bagWIN32_convertCursor(bagE_Cursor cursor)
+{
+    switch (cursor) {
+        case bagE_CursorDefault:   return IDC_ARROW;
+        case bagE_CursorHandPoint: return IDC_HAND;
+        case bagE_CursorMoveAll:   return IDC_SIZEALL;
+        case bagE_CursorMoveHori:  return IDC_SIZEWE;
+        case bagE_CursorMoveVert:  return IDC_SIZENS;
+        case bagE_CursorWait:      return IDC_WAIT;
+        case bagE_CursorWrite:     return IDC_IBEAM;
+        case bagE_CursorCross:     return IDC_CROSS;
+
+        default: return NULL;
+    }
+}
+
+
+void bagE_setCursor(bagE_Cursor cursor)
+{
+    LPSTR id = bagWIN32_convertCursor(cursor);
+    bagWIN32.cursor = LoadCursorA(NULL, id == NULL ? IDC_ARROW : id);
+    bagWIN32_updateCursor();
+}
+
+

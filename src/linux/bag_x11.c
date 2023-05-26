@@ -755,7 +755,7 @@ int bagE_setHiddenCursor(int value)
     return 1;
 }
 
-static inline int bagE_convertCursor(bagE_Cursor cursor)
+static inline int bagX11_convertCursor(bagE_Cursor cursor)
 {
     switch (cursor) {
         case bagE_CursorDefault:   return XC_arrow;
@@ -773,7 +773,7 @@ static inline int bagE_convertCursor(bagE_Cursor cursor)
 
 void bagE_setCursor(bagE_Cursor cursor)
 {
-    int id = bagE_convertCursor(cursor);
+    int id = bagX11_convertCursor(cursor);
     Cursor c = id < 0 ? None : XCreateFontCursor(bagX11.display, id);
     XDefineCursor(bagX11.display, bagX11.window, c);
 }

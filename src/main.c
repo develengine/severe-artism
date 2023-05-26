@@ -56,7 +56,7 @@ int bagE_main(int argc, char *argv[])
 
     float time = 0.0f;
 
-    bagE_setCursor(-1);
+    bagE_setCursor(bagE_CursorHandPoint);
 
     while (running) {
         bagE_pollEvents();

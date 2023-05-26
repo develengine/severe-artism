@@ -12,6 +12,7 @@
  * [ ] separate cursor hiding and restricting into two functions
  * [ ] create a vsync get function
  * [ ] add a blocking event handling routine
+ * [ ] create events for cursor enter and exit
  */
 
 typedef enum
