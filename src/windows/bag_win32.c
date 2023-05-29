@@ -39,7 +39,7 @@
 
 /* FIXME 
  * [ ] can't change keyboard language when window selected
- * [ ] cursor doesn't update to arrow when hower over client area
+ * [X] cursor doesn't update to arrow when hower over client area
  */
 
 
@@ -242,8 +242,10 @@ int WinMain(
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            bagE_defaultWindowWidth,
-            bagE_defaultWindowHeight,
+            /* NOTE: We add pixels to take borders into consideration
+             *       and the default values to correspond to client area. */
+            bagE_defaultWindowWidth + 16,
+            bagE_defaultWindowHeight + 39,
             0,
             0,
             bagWIN32.instance,
@@ -460,6 +462,8 @@ LRESULT CALLBACK bagWIN32_windowProc(
                 event->type = bagE_EventWindowResize;
                 event->data.windowResize.width = winRect.right - winRect.left;
                 event->data.windowResize.height = winRect.bottom - winRect.top;
+                printf("%d, %d\n", event->data.windowResize.width,
+                                   event->data.windowResize.height);
             }
 
             if (bagWIN32.cursorHidden)
