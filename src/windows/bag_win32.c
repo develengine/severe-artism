@@ -462,8 +462,6 @@ LRESULT CALLBACK bagWIN32_windowProc(
                 event->type = bagE_EventWindowResize;
                 event->data.windowResize.width = winRect.right - winRect.left;
                 event->data.windowResize.height = winRect.bottom - winRect.top;
-                printf("%d, %d\n", event->data.windowResize.width,
-                                   event->data.windowResize.height);
             }
 
             if (bagWIN32.cursorHidden)
