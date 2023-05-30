@@ -12,3 +12,7 @@ Camera:
 
 Options:
 - Font size
+- Vsync
+- Fullscreen
+
+

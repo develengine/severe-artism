@@ -30,6 +30,7 @@ static color_t background = { 0.2f, 0.2f, 0.2f, 0.7f };
 typedef struct
 {
     int x, y, w, h;
+    float time;
 } button_t;
 
 
@@ -64,7 +65,7 @@ int bagE_main(int argc, char *argv[])
     bagE_setWindowTitle("severe artism");
 
     // TODO: when interpolation is needed this should be removed
-    bagE_setSwapInterval(0);
+    bagE_setSwapInterval(1);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -133,7 +134,7 @@ int bagE_main(int argc, char *argv[])
 
         gui_begin_grid();
         gui_draw_grid(text, colors, cols, rows,
-                      100, 100, 8 * 3, 16 * 3);
+                      100, 100, 8 * 1, 16 * 1);
 
         gui_update_resolution(window_width, window_height);
         glBindVertexArray(gui.dummy_vao);
@@ -150,7 +151,11 @@ int bagE_main(int argc, char *argv[])
 
         if (cumm >= bagT_getFreq()) {
             cumm %= bagT_getFreq();
-            printf("FPS: %d\n", frame_count);
+
+            char buffer[64] = {0};
+            snprintf(buffer, sizeof(buffer), "severe artism, FPS: %d\n", frame_count);
+            bagE_setWindowTitle(buffer);
+
             frame_count = 0;
         }
     }

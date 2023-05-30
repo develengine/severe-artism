@@ -10,10 +10,38 @@ gui_t gui;
 
 static char text_scratch[MAX_GUI_TEXT_LENGTH];
 
-#define DEFAULT_GRID_CAPACITY 16200
+#define DEFAULT_GRID_CAPACITY 4
 static char *grid_text_scratch;
 static fgbg_t *grid_color_scratch;
 static int grid_capacity = DEFAULT_GRID_CAPACITY;
+
+
+static void init_grid_buffers(void)
+{
+    grid_text_scratch = malloc(grid_capacity);
+    malloc_check(grid_text_scratch);
+
+    grid_color_scratch = malloc(grid_capacity * sizeof(fgbg_t));
+    malloc_check(grid_color_scratch);
+
+    glCreateBuffers(1, &gui.grid_text);
+    glNamedBufferStorage(gui.grid_text, grid_capacity, NULL,
+                         GL_DYNAMIC_STORAGE_BIT);
+
+    glCreateBuffers(1, &gui.grid_color);
+    glNamedBufferStorage(gui.grid_color, grid_capacity * sizeof(fgbg_t), NULL,
+                         GL_DYNAMIC_STORAGE_BIT);
+}
+
+
+static void free_grid_buffers(void)
+{
+    glDeleteBuffers(1, &gui.grid_text);
+    glDeleteBuffers(1, &gui.grid_color);
+    free(grid_text_scratch);
+    free(grid_color_scratch);
+}
+
 
 void init_gui(void)
 {
@@ -41,19 +69,7 @@ void init_gui(void)
 
     gui.text_font = load_texture("res/font_base.png");
 
-    grid_text_scratch = malloc(grid_capacity);
-    malloc_check(grid_text_scratch);
-
-    grid_color_scratch = malloc(grid_capacity * sizeof(fgbg_t));
-    malloc_check(grid_color_scratch);
-
-    glCreateBuffers(1, &gui.grid_text);
-    glNamedBufferStorage(gui.grid_text, grid_capacity, NULL,
-                         GL_DYNAMIC_STORAGE_BIT);
-
-    glCreateBuffers(1, &gui.grid_color);
-    glNamedBufferStorage(gui.grid_color, grid_capacity * sizeof(fgbg_t), NULL,
-                         GL_DYNAMIC_STORAGE_BIT);
+    init_grid_buffers();
 }
 
 
@@ -68,8 +84,7 @@ void exit_gui(void)
 
     glDeleteTextures(1, &gui.text_font);
 
-    glDeleteBuffers(1, &gui.grid_text);
-    glDeleteBuffers(1, &gui.grid_color);
+    free_grid_buffers();
 }
 
 
@@ -164,8 +179,14 @@ void gui_draw_grid(const char *text, fgbg_t *colors, int cols, int rows,
 {
     int count = cols * rows;
 
-    // TODO: Implement resizing of grid.
-    assert(count <= grid_capacity);
+    if (count > grid_capacity) {
+        while (count > grid_capacity) {
+            grid_capacity *= 2;
+        }
+
+        free_grid_buffers();
+        init_grid_buffers();
+    }
 
     for (int i = 0; i < count; ++i) {
         grid_text_scratch[i] = text[i];
