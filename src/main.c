@@ -88,6 +88,30 @@ int bagE_main(int argc, char *argv[])
 
     float dt = 0.01666f;
 
+
+    int cols = 20;
+    int rows = 10;
+    int count = cols * rows;
+
+    char *text = malloc(count);
+    fgbg_t *colors = malloc(count * sizeof(fgbg_t));
+
+    for (int i = 0; i < count; ++i) {
+        text[i] = i % 2 ? 'A' : 'B';
+
+        if (i % 2) {
+            colors[i] = (fgbg_t) {
+                .fg = 0xFF00FF00,
+                .bg = 0xFF0000FF,
+            };
+        } else {
+            colors[i] = (fgbg_t) {
+                .fg = 0xFF0000FF,
+                .bg = 0xFF00FF00,
+            };
+        }
+    }
+
     while (running) {
         bagE_pollEvents();
 
@@ -103,8 +127,13 @@ int bagE_main(int argc, char *argv[])
         /* overlay */
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
+        glBindVertexArray(gui.dummy_vao);
 
         render_gui();
+
+        gui_begin_grid();
+        gui_draw_grid(text, colors, cols, rows,
+                      100, 100, 8 * 3, 16 * 3);
 
         gui_update_resolution(window_width, window_height);
         glBindVertexArray(gui.dummy_vao);

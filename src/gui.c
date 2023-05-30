@@ -3,12 +3,17 @@
 #include "bag_engine.h"
 #include "res.h"
 #include "core.h"
+#include "utils.h"
 
 gui_t gui;
 
 
 static char text_scratch[MAX_GUI_TEXT_LENGTH];
 
+#define DEFAULT_GRID_CAPACITY 16200
+static char *grid_text_scratch;
+static fgbg_t *grid_color_scratch;
+static int grid_capacity = DEFAULT_GRID_CAPACITY;
 
 void init_gui(void)
 {
@@ -29,7 +34,26 @@ void init_gui(void)
             "shaders/image_fragment.glsl"
     );
 
+    gui.grid_program = load_program(
+            "shaders/text_grid.vertex.glsl",
+            "shaders/text_grid.fragment.glsl"
+    );
+
     gui.text_font = load_texture("res/font_base.png");
+
+    grid_text_scratch = malloc(grid_capacity);
+    malloc_check(grid_text_scratch);
+
+    grid_color_scratch = malloc(grid_capacity * sizeof(fgbg_t));
+    malloc_check(grid_color_scratch);
+
+    glCreateBuffers(1, &gui.grid_text);
+    glNamedBufferStorage(gui.grid_text, grid_capacity, NULL,
+                         GL_DYNAMIC_STORAGE_BIT);
+
+    glCreateBuffers(1, &gui.grid_color);
+    glNamedBufferStorage(gui.grid_color, grid_capacity * sizeof(fgbg_t), NULL,
+                         GL_DYNAMIC_STORAGE_BIT);
 }
 
 
@@ -40,8 +64,12 @@ void exit_gui(void)
     glDeleteProgram(gui.rect_program);
     glDeleteProgram(gui.text_program);
     glDeleteProgram(gui.image_program);
+    glDeleteProgram(gui.grid_program);
 
     glDeleteTextures(1, &gui.text_font);
+
+    glDeleteBuffers(1, &gui.grid_text);
+    glDeleteBuffers(1, &gui.grid_color);
 }
 
 
@@ -50,6 +78,7 @@ void gui_update_resolution(int window_width, int window_height)
     glProgramUniform2i(gui.rect_program,  0, window_width, window_height);
     glProgramUniform2i(gui.text_program,  0, window_width, window_height);
     glProgramUniform2i(gui.image_program, 0, window_width, window_height);
+    glProgramUniform2i(gui.grid_program,  0, window_width, window_height);
 }
 
 
@@ -75,6 +104,15 @@ void gui_begin_image(void)
 void gui_use_image(unsigned texture)
 {
     glBindTextureUnit(0, texture);
+}
+
+
+void gui_begin_grid(void)
+{
+    glUseProgram(gui.grid_program);
+    glBindTextureUnit(0, gui.text_font);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, gui.grid_text);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gui.grid_color);
 }
 
 
@@ -121,6 +159,33 @@ void gui_draw_text(const char *text, int x, int y, int w, int h, int s, color_t 
 }
 
 
+void gui_draw_grid(const char *text, fgbg_t *colors, int cols, int rows,
+                   int x, int y, int w, int h)
+{
+    int count = cols * rows;
+
+    // TODO: Implement resizing of grid.
+    assert(count <= grid_capacity);
+
+    for (int i = 0; i < count; ++i) {
+        grid_text_scratch[i] = text[i];
+    }
+
+    for (int i = 0; i < count; ++i) {
+        grid_color_scratch[i] = colors[i];
+    }
+
+    glNamedBufferSubData(gui.grid_text,  0, count, grid_text_scratch);
+    glNamedBufferSubData(gui.grid_color, 0, count * sizeof(fgbg_t), grid_color_scratch);
+
+    glProgramUniform2i(gui.grid_program, 1, x, y);
+    glProgramUniform2i(gui.grid_program, 2, w, h);
+    glProgramUniform2i(gui.grid_program, 3, cols, rows);
+
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, count);
+}
+
+
 void gui_draw_image_colored(int x, int y, int w, int h,
                             float tx, float ty, float tw, float th,
                             color_t color)
@@ -132,6 +197,7 @@ void gui_draw_image_colored(int x, int y, int w, int h,
     glProgramUniform4f(gui.image_program, 5, color.r, color.g, color.b, color.a);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
+
 
 void gui_draw_image(int x, int y, int w, int h,
                     float tx, float ty, float tw, float th)

@@ -10,4 +10,5 @@ Camera:
 - Central
 - Free look
 
-
+Options:
+- Font size
