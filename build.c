@@ -9,6 +9,7 @@ const char *source_files[] = {
     "src/linux/bag_x11.c",
 #else
     "src/windows/bag_win32.c",
+    "src/windows/time_win32.c",
 #endif
 
     "src/glad/gl.c",

@@ -1,5 +1,6 @@
 #include "bag_engine.h"
 #include "bag_keys.h"
+#include "bag_time.h"
 #include "utils.h"
 #include "linalg.h"
 #include "res.h"
@@ -14,21 +15,46 @@
 #include <time.h>
 #include <stdbool.h>
 
+static bool running = true;
 
-bool running = true;
+static int window_width  = 1080;
+static int window_height = 720;
 
-int window_width  = 1080;
-int window_height = 720;
+static bool f11_down   = false;
+static bool fullscreen = false;
 
-bool f11_down   = false;
-bool fullscreen = false;
 
-bool flow_time = true;
+static color_t foreground = { 1.0f, 1.0f, 1.0f, 1.0f };
+static color_t background = { 0.2f, 0.2f, 0.2f, 0.7f };
+
+typedef struct
+{
+    int x, y, w, h;
+} button_t;
+
+
+static void update_gui(float dt)
+{
+    (void)dt;
+}
+
+static void render_gui(void)
+{
+    const char *text = "I like killing animals with my machetay.";
+
+    gui_begin_rect();
+    gui_draw_rect(0, 0, window_width, 24, background);
+
+    gui_begin_text();
+    gui_draw_text(text, 0, 4, 8, 16, 0, foreground);
+}
 
 
 int bagE_main(int argc, char *argv[])
 {
     (void)argc; (void)argv;
+
+    bagT_init();
 
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(opengl_callback, 0);
@@ -38,7 +64,7 @@ int bagE_main(int argc, char *argv[])
     bagE_setWindowTitle("severe artism");
 
     // TODO: when interpolation is needed this should be removed
-    bagE_setSwapInterval(1);
+    bagE_setSwapInterval(0);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -54,15 +80,21 @@ int bagE_main(int argc, char *argv[])
 
     init_gui();
 
-    float time = 0.0f;
-
     bagE_setCursor(bagE_CursorHandPoint);
+
+    int64_t cumm = 0;
+    int64_t first = bagT_getTime();
+    int frame_count = 0;
+
+    float dt = 0.01666f;
 
     while (running) {
         bagE_pollEvents();
 
         if (!running)
             break;
+
+        update_gui(dt);
 
         /* rendering */
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
@@ -72,21 +104,26 @@ int bagE_main(int argc, char *argv[])
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
 
+        render_gui();
+
         gui_update_resolution(window_width, window_height);
         glBindVertexArray(gui.dummy_vao);
 
-        const char *text = "I like killing animals with my machetay.";
-
-        gui_begin_rect();
-        gui_draw_rect(0, 0, window_width, 24, (color_t) {{ 0.2f, 0.2f, 0.2f, 0.7f }});
-
-        gui_begin_text();
-        gui_draw_text(text, 0, 4, 8, 16, 0, (color_t) {{ 1.0f, 1.0f, 1.0f, 1.0f }});
-
-        if (flow_time)
-            time += 0.01666f;
-
         bagE_swapBuffers();
+
+        int64_t second = bagT_getTime();
+        int64_t diff = second - first;
+        first = second;
+
+        dt = (float)diff / bagT_getFreq();
+        cumm += diff;
+        ++frame_count;
+
+        if (cumm >= bagT_getFreq()) {
+            cumm %= bagT_getFreq();
+            printf("FPS: %d\n", frame_count);
+            frame_count = 0;
+        }
     }
   
     exit_gui();
@@ -129,12 +166,6 @@ int bagE_eventHandler(bagE_Event *event)
                     } else {
                         f11_down = false;
                     }
-                    break;
-
-                case KEY_P:
-                    if (down)
-                        break;
-                    flow_time = !flow_time;
                     break;
             }
         } break;
