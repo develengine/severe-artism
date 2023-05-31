@@ -19,6 +19,7 @@ const char *source_files[] = {
     "src/res.c",
     "src/core.c",
     "src/gui.c",
+    "src/editor.c",
 
     NULL
 };

@@ -6,6 +6,7 @@
 #include "res.h"
 #include "core.h"
 #include "gui.h"
+#include "editor.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -33,6 +34,8 @@ typedef struct
     float time;
 } button_t;
 
+static editor_t editor;
+
 
 static void update_gui(float dt)
 {
@@ -48,6 +51,8 @@ static void render_gui(void)
 
     gui_begin_text();
     gui_draw_text(text, 0, 4, 8, 16, 0, foreground);
+
+    editor_render(&editor, 100, 100);
 }
 
 
@@ -64,7 +69,6 @@ int bagE_main(int argc, char *argv[])
 
     bagE_setWindowTitle("severe artism");
 
-    // TODO: when interpolation is needed this should be removed
     bagE_setSwapInterval(1);
 
     glEnable(GL_DEPTH_TEST);
@@ -81,37 +85,15 @@ int bagE_main(int argc, char *argv[])
 
     init_gui();
 
-    bagE_setCursor(bagE_CursorHandPoint);
+    editor_init(&editor);
+    char text[] = "lol\nkrkrke\n\nlol\nshrek";
+    editor_replace(&editor, 0, 0, text, (int)strlen(text));
 
     int64_t cumm = 0;
     int64_t first = bagT_getTime();
     int frame_count = 0;
 
     float dt = 0.01666f;
-
-
-    int cols = 20;
-    int rows = 10;
-    int count = cols * rows;
-
-    char *text = malloc(count);
-    fgbg_t *colors = malloc(count * sizeof(fgbg_t));
-
-    for (int i = 0; i < count; ++i) {
-        text[i] = i % 2 ? 'A' : 'B';
-
-        if (i % 2) {
-            colors[i] = (fgbg_t) {
-                .fg = 0xFF00FF00,
-                .bg = 0xFF0000FF,
-            };
-        } else {
-            colors[i] = (fgbg_t) {
-                .fg = 0xFF0000FF,
-                .bg = 0xFF00FF00,
-            };
-        }
-    }
 
     while (running) {
         bagE_pollEvents();
@@ -131,10 +113,6 @@ int bagE_main(int argc, char *argv[])
         glBindVertexArray(gui.dummy_vao);
 
         render_gui();
-
-        gui_begin_grid();
-        gui_draw_grid(text, colors, cols, rows,
-                      100, 100, 8 * 1, 16 * 1);
 
         gui_update_resolution(window_width, window_height);
         glBindVertexArray(gui.dummy_vao);
@@ -182,6 +160,17 @@ int bagE_eventHandler(bagE_Event *event)
             window_width  = wr->width;
             window_height = wr->height;
             glViewport(0, 0, wr->width, wr->height);
+        } break;
+
+        case bagE_EventMouseButtonDown:
+            down = true;
+            /* fallthrough */
+        case bagE_EventMouseButtonUp: {
+            bagE_MouseButton mb = event->data.mouseButton;
+
+            if (rect_contains(editor_area(&editor, 100, 100), mb.x, mb.y)) {
+                editor_handle_mouse_button(&editor, 100, 100, mb, down);
+            }
         } break;
 
         case bagE_EventKeyDown: 

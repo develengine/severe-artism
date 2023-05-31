@@ -11,6 +11,13 @@ typedef struct
     int x, y, w, h;
 } rect_t;
 
+static inline bool rect_contains(rect_t rect, int x, int y)
+{
+    return x >= rect.x && x < rect.x + rect.w
+        && y >= rect.y && y < rect.y + rect.h;
+}
+
+
 typedef struct
 {
     unsigned fg, bg;

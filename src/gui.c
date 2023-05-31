@@ -10,7 +10,7 @@ gui_t gui;
 
 static char text_scratch[MAX_GUI_TEXT_LENGTH];
 
-#define DEFAULT_GRID_CAPACITY 4
+#define DEFAULT_GRID_CAPACITY 16200
 static char *grid_text_scratch;
 static fgbg_t *grid_color_scratch;
 static int grid_capacity = DEFAULT_GRID_CAPACITY;
