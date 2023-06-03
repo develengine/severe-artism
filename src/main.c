@@ -1,3 +1,5 @@
+#include <windows.h> // XXX:
+
 #include "bag_engine.h"
 #include "bag_keys.h"
 #include "bag_time.h"
@@ -143,7 +145,6 @@ int bagE_main(int argc, char *argv[])
     return 0;
 }
 
-
 int bagE_eventHandler(bagE_Event *event)
 {
     bool down = false;
@@ -168,9 +169,7 @@ int bagE_eventHandler(bagE_Event *event)
         case bagE_EventMouseButtonUp: {
             bagE_MouseButton mb = event->data.mouseButton;
 
-            if (rect_contains(editor_area(&editor, 100, 100), mb.x, mb.y)) {
-                editor_handle_mouse_button(&editor, 100, 100, mb, down);
-            }
+            editor_handle_mouse_button(&editor, 100, 100, mb, down);
         } break;
 
         case bagE_EventKeyDown: 
@@ -190,7 +189,30 @@ int bagE_eventHandler(bagE_Event *event)
                         f11_down = false;
                     }
                     break;
+
+                case KEY_P: {
+                    if (down)
+                        break;
+
+                } break;
+
+                case KEY_C: {
+                    if (down)
+                        break;
+
+                } break;
             }
+
+            editor_handle_key(&editor, *key, down);
+        } break;
+
+        case bagE_EventTextUTF8: {
+            editor_handle_utf8(&editor, event->data.textUTF8);
+        } break;
+
+        case bagE_EventMousePosition: {
+            bagE_Mouse m = event->data.mouse;
+            editor_handle_mouse_position(&editor, 100, 100, m);
         } break;
 
         default: break;

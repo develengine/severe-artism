@@ -822,3 +822,87 @@ void bagE_setCursor(bagE_Cursor cursor)
 }
 
 
+int bagE_clipCopy(const char *str, int size)
+{
+    if (!OpenClipboard(GetActiveWindow()))
+        return 0;
+
+    EmptyClipboard();
+
+    HANDLE handle = GlobalAlloc(GMEM_MOVEABLE, size + 1);
+
+    if (handle) {
+        char *data = GlobalLock(handle);
+        memcpy(data, str, (size_t)size);
+        data[size] = '\0';
+
+        GlobalUnlock(handle);
+
+        SetClipboardData(CF_TEXT, handle);
+    } else {
+        return 0;
+    }
+
+    CloseClipboard();
+
+    return 1;
+}
+
+
+int bagE_clipPaste(char *buffer, int capacity)
+{
+    if (!IsClipboardFormatAvailable(CF_TEXT))
+        return -1;
+
+    if (!OpenClipboard(GetActiveWindow()))
+        return -1;
+
+    int i = -1;
+
+    HANDLE handle = GetClipboardData(CF_TEXT);
+
+    if (handle) {
+        char *data = GlobalLock(handle);
+
+        if (data) {
+            for (i = 0; i < capacity && data[i] != '\0'; ++i) {
+                buffer[i] = data[i];
+            }
+
+            GlobalUnlock(handle);
+        }
+    }
+
+    CloseClipboard();
+
+    return i;
+}
+
+
+int bagE_clipSize(void)
+{
+    if (!IsClipboardFormatAvailable(CF_TEXT))
+        return -1;
+
+    if (!OpenClipboard(GetActiveWindow()))
+        return -1;
+
+    int res = -1;
+
+    HANDLE handle = GetClipboardData(CF_TEXT);
+
+    if (handle) {
+        char *data = GlobalLock(handle);
+
+        if (data) {
+            res = (int)strlen(data);
+
+            GlobalUnlock(handle);
+        }
+    }
+
+    CloseClipboard();
+
+    return res;
+}
+

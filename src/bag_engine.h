@@ -6,6 +6,7 @@
 #define BAGE_TEXT_SIZE 12
 
 /* TODO
+ * [ ] add mod flags to key events
  * [ ] static functionality enabling
  * [ ] dynamic functionality enabling
  * [ ] opengl version selection
@@ -136,6 +137,10 @@ void bagE_setWindowTitle(char *value);
 void bagE_setSwapInterval(int value);
 void bagE_setCursorPosition(int x, int y);
 void bagE_setCursor(bagE_Cursor cursor);
+
+int bagE_clipCopy(const char *str, int size);
+int bagE_clipPaste(char *buffer, int capacity);
+int bagE_clipSize(void);
 
 /* User defined */
 int bagE_eventHandler(bagE_Event *event);

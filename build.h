@@ -402,7 +402,7 @@ static inline pid_t execute_vargs(const char *fmt, va_list args)
     if (pid == 0) {
         execl("/bin/sh", "sh", "-c", buffer, NULL);
 
-        fprintf(stderr, "execve(): %s\n", strerror(errno));
+        fprintf(stderr, "execl(): %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
