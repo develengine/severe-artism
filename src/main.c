@@ -1,5 +1,3 @@
-#include <windows.h> // XXX:
-
 #include "bag_engine.h"
 #include "bag_keys.h"
 #include "bag_time.h"
@@ -26,6 +24,12 @@ static int window_height = 720;
 static bool f11_down   = false;
 static bool fullscreen = false;
 
+static float fov = 90.0f;
+
+static float camera_pitch = 0.0f;
+static float camera_yaw   = 0.0f;
+static vec3_t camera_pos  = { 0.0f, 0.0f, 0.0f };
+
 
 static color_t foreground = { 1.0f, 1.0f, 1.0f, 1.0f };
 static color_t background = { 0.2f, 0.2f, 0.2f, 0.7f };
@@ -39,11 +43,6 @@ typedef struct
 static editor_t editor;
 
 
-static void update_gui(float dt)
-{
-    (void)dt;
-}
-
 static void render_gui(void)
 {
     const char *text = "I like killing animals with my machetay.";
@@ -54,7 +53,7 @@ static void render_gui(void)
     gui_begin_text();
     gui_draw_text(text, 0, 4, 8, 16, 0, foreground);
 
-    editor_render(&editor, 100, 100);
+    // editor_render(&editor, 100, 100);
 }
 
 
@@ -87,9 +86,52 @@ int bagE_main(int argc, char *argv[])
 
     init_gui();
 
+
     editor_init(&editor);
     char text[] = "lol\nkrkrke\n\nlol\nshrek";
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
+
+
+    /* crap goes here */
+    unsigned texture_program = load_program(
+            "shaders/texture.vert.glsl",
+            "shaders/texture.frag.glsl"
+    );
+
+    model_object_t head_model = load_model_object("res/head.model");
+
+    unsigned stone_texture = load_texture("res/stone.png");
+
+    unsigned cam_ubo = create_buffer_object(
+        sizeof(matrix_t) * 3 + sizeof(float) * 4,
+        NULL,
+        GL_DYNAMIC_STORAGE_BIT
+    );
+
+    unsigned env_ubo = create_buffer_object(
+        sizeof(float) * 4 * 4,
+        NULL,
+        GL_DYNAMIC_STORAGE_BIT
+    );
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, cam_ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 1, env_ubo);
+
+    struct {
+        float ambient[4];
+        float to_light[4];
+        float sun_color[4];
+    } env_data = {
+        .ambient   = { 0.1f, 0.2f, 0.3f, 1.0f },
+        .to_light  = { 0.6f, 0.7f, 0.5f },
+        .sun_color = { 1.0f, 1.0f, 1.0f },
+    };
+
+    glNamedBufferSubData(env_ubo, 0, sizeof(env_data), &env_data);
+
+    float model_rot = 0.0f;
+
 
     int64_t cumm = 0;
     int64_t first = bagT_getTime();
@@ -103,11 +145,54 @@ int bagE_main(int argc, char *argv[])
         if (!running)
             break;
 
-        update_gui(dt);
-
         /* rendering */
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glEnable(GL_DEPTH_TEST);
+
+
+        matrix_t view = matrix_multiply(
+            matrix_rotation_x(camera_pitch),
+            matrix_multiply(
+                matrix_rotation_y(camera_yaw),
+                matrix_translation(-camera_pos.x, -camera_pos.y, -camera_pos.z)
+            )
+        );
+
+        matrix_t proj = matrix_projection(
+            fov,
+            (float)window_width,
+            (float)window_height,
+            0.1f,
+            100.0f /* NOTE: for now so the map doesn't clip */
+        );
+
+        matrix_t vp = matrix_multiply(proj, view);
+
+        struct {
+            matrix_t mats[3];
+            float pos[4];
+        } cam_data = {
+            .mats = { view, proj, vp },
+            .pos  = { camera_pos.x, camera_pos.y, camera_pos.z }
+        };
+
+        glNamedBufferSubData(cam_ubo, 0, sizeof(cam_data), &cam_data);
+
+        matrix_t model = matrix_multiply(matrix_translation(0.0f,-0.5f,-4.0f),
+                                         matrix_rotation_y(model_rot));
+
+        model_rot += dt;
+
+        glUseProgram(texture_program);
+        glBindVertexArray(head_model.vao);
+        glBindTextureUnit(0, stone_texture);
+
+        glProgramUniformMatrix4fv(texture_program, 0, 1, false, model.data);
+
+        glDrawElements(GL_TRIANGLES, head_model.index_count, GL_UNSIGNED_INT, NULL);
+
 
         /* overlay */
         glDisable(GL_DEPTH_TEST);
@@ -169,7 +254,7 @@ int bagE_eventHandler(bagE_Event *event)
         case bagE_EventMouseButtonUp: {
             bagE_MouseButton mb = event->data.mouseButton;
 
-            editor_handle_mouse_button(&editor, 100, 100, mb, down);
+            // editor_handle_mouse_button(&editor, 100, 100, mb, down);
         } break;
 
         case bagE_EventKeyDown: 
@@ -189,30 +274,18 @@ int bagE_eventHandler(bagE_Event *event)
                         f11_down = false;
                     }
                     break;
-
-                case KEY_P: {
-                    if (down)
-                        break;
-
-                } break;
-
-                case KEY_C: {
-                    if (down)
-                        break;
-
-                } break;
             }
 
-            editor_handle_key(&editor, *key, down);
+            // editor_handle_key(&editor, *key, down);
         } break;
 
         case bagE_EventTextUTF8: {
-            editor_handle_utf8(&editor, event->data.textUTF8);
+            // editor_handle_utf8(&editor, event->data.textUTF8);
         } break;
 
         case bagE_EventMousePosition: {
             bagE_Mouse m = event->data.mouse;
-            editor_handle_mouse_position(&editor, 100, 100, m);
+            // editor_handle_mouse_position(&editor, 100, 100, m);
         } break;
 
         default: break;

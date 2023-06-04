@@ -1,3 +1,5 @@
+#include "obj_parser.h"
+
 #include "utils.h"
 
 #include <stdbool.h>
@@ -8,16 +10,16 @@
 
 typedef struct
 {
-    int vertexCount;
-    int textureCount;
-    int normalCount;
-    int indexCount;
-} ObjInfo;
+    int vertex_count;
+    int texture_count;
+    int normal_count;
+    int index_count;
+} obj_info_t;
 
 
-static ObjInfo loadInfo(const char *text)
+static obj_info_t load_info(const char *text)
 {
-    ObjInfo info = {0};
+    obj_info_t info = {0};
 
     const char *at = text;
     while (at != NULL) {
@@ -26,11 +28,11 @@ static ObjInfo loadInfo(const char *text)
 
         if (at[1] == 'v') {
             if (at[2] == ' ')
-                info.vertexCount++;
+                info.vertex_count++;
             else if (at[2] == 't')
-                info.textureCount++;
+                info.texture_count++;
             else if (at[2] == 'n')
-                info.normalCount++;
+                info.normal_count++;
         } else if (at[1] == 'f') {
             int ic = 0;
             for (at += 2; *at != '\0' && *at != '\n'; ++at) {
@@ -38,7 +40,7 @@ static ObjInfo loadInfo(const char *text)
                     ++ic;
             }
 
-            info.indexCount += 3 * (ic - 2);
+            info.index_count += 3 * (ic - 2);
 
             continue;
         }
@@ -52,54 +54,49 @@ static ObjInfo loadInfo(const char *text)
 
 typedef struct
 {
-    int posID, texID, normID;
+    int pos_id, tex_id, norm_id;
     int index;
-} Index;
+} index_t;
 
 
-typedef struct
+static bool index_eq(const index_t *i1, const index_t *i2)
 {
-    float positions[3];
-    float textures[2];
-    float normals[3];
-} Vertex;
-
-
-static bool indexEq(const Index *i1, const Index *i2)
-{
-    return i1->posID  == i2->posID
-        && i1->texID  == i2->texID
-        && i1->normID == i2->normID;
+    return i1->pos_id  == i2->pos_id
+        && i1->tex_id  == i2->tex_id
+        && i1->norm_id == i2->norm_id;
 }
 
 
-static void parse(const ObjInfo *info, const char *text, FILE *out)
+model_data_t load_obj_file(const char *path)
 {
-    float *positions, *textures, *normals;
+    char *text = read_file(path);
+    obj_info_t info = load_info(text);
 
-    positions = malloc(
-            sizeof(float) * (info->vertexCount * 3 + info->textureCount * 2 + info->normalCount * 3)
+    float *positions = malloc(
+            sizeof(float) * (info.vertex_count * 3 +
+                             info.texture_count * 2 +
+                             info.normal_count * 3)
     );
     malloc_check(positions);
 
-    textures = positions + 3 * info->vertexCount;
-    normals  = textures  + 2 * info->textureCount;
+    float *textures = positions + 3 * info.vertex_count;
+    float *normals  = textures  + 2 * info.texture_count;
 
-    Index *indices = malloc(sizeof(Index) * info->indexCount);
+    index_t *indices = malloc(sizeof(index_t) * info.index_count);
     malloc_check(indices);
 
-    Vertex *vertices = malloc(sizeof(Vertex) * info->indexCount);
+    vertex_t *vertices = malloc(sizeof(vertex_t) * info.index_count);
     malloc_check(vertices);
 
-    unsigned *indexData = malloc(sizeof(unsigned) * info->indexCount);
-    malloc_check(indexData);
+    unsigned *index_data = malloc(sizeof(unsigned) * info.index_count);
+    malloc_check(index_data);
 
-    int posOffset  = 0;
-    int texOffset  = 0;
-    int normOffset = 0;
+    int pos_offset  = 0;
+    int tex_offset  = 0;
+    int norm_offset = 0;
 
-    int vertexCount = 0;
-    int indexCount = 0;
+    int vertex_count = 0;
+    int index_count  = 0;
 
     const char *at = text;
     char *end;
@@ -109,27 +106,27 @@ static void parse(const ObjInfo *info, const char *text, FILE *out)
 
         if (at[1] == 'v') {
             if (at[2] == ' ') {
-                positions[posOffset++] = strtof(at + 3, &end);
+                positions[pos_offset++] = strtof(at + 3, &end);
                 at = end;
-                positions[posOffset++] = strtof(at, &end);
+                positions[pos_offset++] = strtof(at, &end);
                 at = end;
-                positions[posOffset++] = strtof(at, &end);
+                positions[pos_offset++] = strtof(at, &end);
                 at = end;
             } else if (at[2] == 't') {
-                textures[texOffset++] = strtof(at + 4, &end);
+                textures[tex_offset++] = strtof(at + 4, &end);
                 at = end;
-                textures[texOffset++] = strtof(at, &end);
+                textures[tex_offset++] = strtof(at, &end);
                 at = end;
             } else if (at[2] == 'n') {
-                normals[normOffset++] = strtof(at + 4, &end);
+                normals[norm_offset++] = strtof(at + 4, &end);
                 at = end;
-                normals[normOffset++] = strtof(at, &end);
+                normals[norm_offset++] = strtof(at, &end);
                 at = end;
-                normals[normOffset++] = strtof(at, &end);
+                normals[norm_offset++] = strtof(at, &end);
                 at = end;
             }
         } else if (at[1] == 'f') {
-            Index inds[3];
+            index_t inds[3];
             int ic = 0;
 
             ++at;
@@ -139,52 +136,52 @@ static void parse(const ObjInfo *info, const char *text, FILE *out)
                     --ic;
                 }
 
-                inds[ic].posID  = strtol(++at, &end, 10) - 1;
+                inds[ic].pos_id  = strtol(++at, &end, 10) - 1;
                 at = end;
-                inds[ic].texID  = strtol(++at, &end, 10) - 1;
+                inds[ic].tex_id  = strtol(++at, &end, 10) - 1;
                 at = end;
-                inds[ic].normID = strtol(++at, &end, 10) - 1;
+                inds[ic].norm_id = strtol(++at, &end, 10) - 1;
                 at = end;
 
                 if (++ic == 3) {
                     for (int i = 0; i < 3; ++i) {
                         bool found = false;
 
-                        // TODO heap search
-                        for (int j = 0; j < vertexCount; ++j) {
-                            if (indexEq(inds + i, indices + j)) {
-                                indexData[indexCount++] = indices[j].index;
+                        // TODO: heap search
+                        for (int j = 0; j < vertex_count; ++j) {
+                            if (index_eq(inds + i, indices + j)) {
+                                index_data[index_count++] = indices[j].index;
                                 found = true;
                                 break;
                             }
                         }
 
                         if (!found) {
-                            Vertex vert;
-                            int offset = 3 * inds[i].posID;
+                            vertex_t vert;
+                            int offset = 3 * inds[i].pos_id;
                             vert.positions[0] = positions[offset];
                             vert.positions[1] = positions[offset + 1];
                             vert.positions[2] = positions[offset + 2];
-                            offset = 2 * inds[i].texID;
+                            offset = 2 * inds[i].tex_id;
                             vert.textures[0] = textures[offset];
                             vert.textures[1] = textures[offset + 1];
-                            offset = 3 * inds[i].normID;
+                            offset = 3 * inds[i].norm_id;
                             vert.normals[0] = normals[offset];
                             vert.normals[1] = normals[offset + 1];
                             vert.normals[2] = normals[offset + 2];
 
-                            vertices[vertexCount] = vert;
+                            vertices[vertex_count] = vert;
 
-                            Index ind = {
-                                    inds[i].posID,
-                                    inds[i].texID,
-                                    inds[i].normID,
-                                    vertexCount
+                            index_t ind = {
+                                    inds[i].pos_id,
+                                    inds[i].tex_id,
+                                    inds[i].norm_id,
+                                    vertex_count
                             };
 
-                            indices[vertexCount] = ind;
+                            indices[vertex_count] = ind;
 
-                            indexData[indexCount++] = vertexCount++;
+                            index_data[index_count++] = vertex_count++;
                         }
                     }
                 }
@@ -194,39 +191,14 @@ static void parse(const ObjInfo *info, const char *text, FILE *out)
         }
     }
 
-    // TODO FIXME write failure handling
-    safe_write(&vertexCount, sizeof(int), 1, out);
-    safe_write(&indexCount, sizeof(int), 1, out);
-    safe_write(vertices, sizeof(Vertex), vertexCount, out);
-    safe_write(indexData, sizeof(unsigned), indexCount, out);
-
-    printf("v: %d\n", vertexCount);
-    printf("i: %d\n", indexCount);
-
     free(positions);
-    free(indices);
-    free(vertices);
-    free(indexData);
-}
-
-
-int main(int argc, char *argv[])
-{
-    if (argc != 3) {
-        fprintf(stderr, "use: obj_parser <input-file> <output-file>\n");
-        exit(1);
-    }
-
-    char *text = read_file(argv[1]);
-
-    ObjInfo info = loadInfo(text);
-
-    FILE *out = fopen(argv[2], "wb");
-    file_check(out, argv[2]);
-
-    parse(&info, text, out);
-
-    fclose(out);
     free(text);
-    return 0;
+
+    return (model_data_t) {
+        .vertex_count = vertex_count,
+        .index_count  = index_count,
+        .vertices     = vertices,
+        .indices      = index_data,
+    };
 }
+

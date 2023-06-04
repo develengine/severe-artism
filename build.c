@@ -20,6 +20,7 @@ const char *source_files[] = {
     "src/core.c",
     "src/gui.c",
     "src/editor.c",
+    "src/obj_parser.c",
 
     NULL
 };

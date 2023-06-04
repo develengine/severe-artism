@@ -290,15 +290,15 @@ bool editor_handle_mouse_position(editor_t *editor, int x, int y,
 
 bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
 {
-    if (!down)
-        return false;
-
     switch (event.key) {
         case KEY_CONTROL_LEFT:
             editor->ctrl_down = down;
             break;
 
         case KEY_UP: {
+            if (!down)
+                break;
+
             ivec2_t p = index_to_coords(editor, editor->cursor_index);
 
             editor->cursor_index = index_move_up_n(editor,
@@ -316,6 +316,9 @@ bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
         } break;
 
         case KEY_DOWN: {
+            if (!down)
+                break;
+
             ivec2_t p = index_to_coords(editor, editor->cursor_index);
 
             editor->cursor_index = index_move_down_n(editor,
@@ -333,27 +336,42 @@ bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
         } break;
 
         case KEY_LEFT: {
+            if (!down)
+                break;
+
             if (editor->cursor_index > 0) {
                 --editor->cursor_index;
             }
         } break;
 
         case KEY_RIGHT: {
+            if (!down)
+                break;
+
             if (editor->cursor_index < editor->text_size) {
                 ++editor->cursor_index;
             }
         } break;
 
         case KEY_RETURN: {
+            if (!down)
+                break;
+
             editor_replace(editor, editor->cursor_index, 0, "\n", 1);
             editor->cursor_index++;
         } break;
 
         case KEY_DELETE: {
+            if (!down)
+                break;
+
             editor_replace(editor, editor->cursor_index, 1, "", 0);
         } break;
 
         case KEY_BACK: {
+            if (!down)
+                break;
+
             if (editor->cursor_index > 0) {
                 editor_replace(editor, editor->cursor_index - 1, 1, "", 0);
                 --editor->cursor_index;
@@ -361,6 +379,9 @@ bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
         } break;
 
         case KEY_C: {
+            if (!down)
+                break;
+
             if (!editor->ctrl_down)
                 break;
 
@@ -377,6 +398,9 @@ bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
         } break;
 
         case KEY_V: {
+            if (!down)
+                break;
+
             if (!editor->ctrl_down)
                 break;
 
@@ -393,6 +417,9 @@ bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
         } break;
 
         case KEY_X: {
+            if (!down)
+                break;
+
             if (!editor->ctrl_down)
                 break;
 

@@ -154,6 +154,19 @@ typedef union
 
 typedef vector_t color_t;
 
+static inline vector_t vector_transform(vector_t v, matrix_t m)
+{
+    vector_t res = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            res.data[i] += m.data[i + j * 4] * v.data[j];
+        }
+    }
+
+    return res;
+}
+
 
 typedef union
 {
