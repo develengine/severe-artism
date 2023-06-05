@@ -4,6 +4,7 @@
 #include "linalg.h"
 
 #include <stdlib.h>
+#include <stdint.h>
 
 
 typedef struct
@@ -84,6 +85,22 @@ static inline void free_animated_data(animated_data_t animated)
     free_armature(animated.armature);
 }
 
+
+typedef struct
+{
+    unsigned *data;
+    int width, height;
+} texture_data_t;
+
+static inline void free_texture_data(texture_data_t texture)
+{
+    free(texture.data);
+}
+
+
+uint8_t *load_image(const char *path, int *width, int *height, int *channels, bool flip);
+
+texture_data_t load_texture_data(const char *path);
 
 model_data_t load_model_data(const char *path);
 void print_model_data(const model_data_t *model);

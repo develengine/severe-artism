@@ -5,6 +5,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+
+uint8_t *load_image(const char *path, int *width, int *height, int *channels, bool flip)
+{
+    stbi_set_flip_vertically_on_load(flip);
+
+    uint8_t *image = stbi_load(path, width, height, channels, STBI_rgb_alpha);
+    if (!image) {
+        fprintf(stderr, "Failed to load image \"%s\"\n", path);
+        exit(1);
+    }
+
+    return image;
+}
+
+
+texture_data_t load_texture_data(const char *path)
+{
+    texture_data_t res = {0};
+    int channelCount;
+
+    res.data = (unsigned *)load_image(path, &res.width, &res.height, &channelCount, true);
+
+    return res;
+}
+
+
 model_data_t load_model_data(const char *path)
 {
     model_data_t model_data;

@@ -67,7 +67,7 @@ void init_gui(void)
             "shaders/text_grid.fragment.glsl"
     );
 
-    gui.text_font = load_texture("res/font_base.png");
+    gui.text_font = load_texture_object("res/font_base.png");
 
     init_grid_buffers();
 }

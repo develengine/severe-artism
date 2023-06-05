@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <stdbool.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -329,6 +330,34 @@ static inline float clamp(float x, float mn, float mx)
     if (x < mn) return mn;
     if (x > mx) return mx;
     return x;
+}
+
+
+typedef struct
+{
+    int x, y, w, h;
+} rect_t;
+
+static inline bool rect_contains(rect_t rect, int x, int y)
+{
+    return x >= rect.x && x < rect.x + rect.w
+        && y >= rect.y && y < rect.y + rect.h;
+}
+
+
+typedef struct
+{
+    float x, y, w, h;
+} frect_t;
+
+static inline frect_t frect_make(rect_t rect, int width, int height)
+{
+    return (frect_t) {
+        .x = rect.x / (float)width,
+        .y = rect.y / (float)height,
+        .w = rect.w / (float)width,
+        .h = rect.h / (float)height,
+    };
 }
 
 #endif

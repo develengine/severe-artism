@@ -5,9 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 
 void GLAPIENTRY opengl_callback(
         GLenum source,
@@ -194,25 +191,8 @@ int load_program(const char *vertex_path, const char *fragment_path)
 }
 
 
-uint8_t *load_image(const char *path, int *width, int *height, int *channels, bool flip)
+unsigned create_texture_object(texture_data_t data)
 {
-    stbi_set_flip_vertically_on_load(flip);
-
-    uint8_t *image = stbi_load(path, width, height, channels, STBI_rgb_alpha);
-    if (!image) {
-        fprintf(stderr, "Failed to load image \"%s\"\n", path);
-        exit(1);
-    }
-
-    return image;
-}
-
-
-unsigned load_texture(const char *path)
-{
-    int width, height, channelCount;
-    uint8_t *image = load_image(path, &width, &height, &channelCount, true);
-
     unsigned texture;
     glCreateTextures(GL_TEXTURE_2D, 1, &texture);
     glTextureParameteri(texture, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -220,12 +200,23 @@ unsigned load_texture(const char *path)
     glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glTextureStorage2D(texture, (int)log2(width), GL_RGBA8, width, height);
-    glTextureSubImage2D(texture, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, image);
+    glTextureStorage2D(texture, (int)log2(data.width), GL_RGBA8, data.width, data.height);
+    glTextureSubImage2D(texture, 0, 0, 0, data.width, data.height,
+                        GL_RGBA, GL_UNSIGNED_BYTE, data.data);
 
     glGenerateTextureMipmap(texture);
 
-    free(image);
+    return texture;
+}
+
+
+unsigned load_texture_object(const char *path)
+{
+    texture_data_t data = load_texture_data(path);
+
+    unsigned texture = create_texture_object(data);
+
+    free_texture_data(data);
 
     return texture;
 }

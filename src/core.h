@@ -50,8 +50,8 @@ void print_context_info(void);
 int load_shader(const char *path, GLenum type);
 int load_program(const char *vertex_path, const char *fragment_path);
 
-uint8_t *load_image(const char *path, int *width, int *height, int *channels, bool flip);
-unsigned load_texture(const char *path);
+unsigned create_texture_object(texture_data_t texture);
+unsigned load_texture_object(const char *path);
 
 model_object_t create_model_object(model_data_t model);
 model_object_t load_model_object(const char *path);

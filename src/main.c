@@ -7,6 +7,7 @@
 #include "core.h"
 #include "gui.h"
 #include "editor.h"
+#include "generator.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -29,6 +30,23 @@ static float fov = 90.0f;
 static float camera_pitch = 0.0f;
 static float camera_yaw   = 0.0f;
 static vec3_t camera_pos  = { 0.0f, 0.0f, 0.0f };
+
+static bool free_look = false;
+static float look_sensitivity = 0.002f;
+
+typedef enum
+{
+    input_Up,
+    input_Down,
+    input_Left,
+    input_Right,
+    input_Forth,
+    input_Back,
+
+    INPUT_COUNT
+} input_t;
+
+static bool input[INPUT_COUNT] = {0};
 
 
 static color_t foreground = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -88,7 +106,7 @@ int bagE_main(int argc, char *argv[])
 
 
     editor_init(&editor);
-    char text[] = "lol\nkrkrke\n\nlol\nshrek";
+    char text[] = "\n \\__/\n  \\/\n";
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
 
 
@@ -98,9 +116,37 @@ int bagE_main(int argc, char *argv[])
             "shaders/texture.frag.glsl"
     );
 
-    model_object_t head_model = load_model_object("res/head.model");
+    texture_data_t textures[] = {
+        load_texture_data("res/stone.png"),
+        load_texture_data("res/rat.png"),
+    };
 
-    unsigned stone_texture = load_texture("res/stone.png");
+    rect_t views[length(textures)];
+
+    texture_data_t atlas_data = create_texture_atlas(textures, views, length(textures));
+    unsigned atlas_texture = create_texture_object(atlas_data);
+
+    model_data_t cylinder = generate_cylinder(8, frect_make(views[1],
+                                                            atlas_data.width,
+                                                            atlas_data.height));
+
+    model_data_t sphere = generate_quad_sphere(2, frect_make(views[1],
+                                                             atlas_data.width,
+                                                             atlas_data.height));
+
+    model_data_t head_model = load_model_data("res/head.model");
+    model_map_textures_to_view(&head_model, frect_make(views[0],
+                                                       atlas_data.width,
+                                                       atlas_data.height));
+
+    model_builder_t builder = {0};
+
+    model_builder_merge(&builder, cylinder,   matrix_translation( 0.0f, 0.0f, 0.0f));
+    model_builder_merge(&builder, sphere,     matrix_translation( 0.0f, 2.0f, 0.0f));
+    model_builder_merge(&builder, head_model, matrix_translation( 1.0f, 0.0f, 0.0f));
+    model_builder_merge(&builder, head_model, matrix_translation(-1.0f, 0.5f, 0.0f));
+
+    model_object_t head_object = create_model_object(builder.data);
 
     unsigned cam_ubo = create_buffer_object(
         sizeof(matrix_t) * 3 + sizeof(float) * 4,
@@ -145,6 +191,43 @@ int bagE_main(int argc, char *argv[])
         if (!running)
             break;
 
+        if (free_look) {
+            float vx = 0.0f, vz = 0.0f;
+            float speed = 3.0f;
+
+            if (input[input_Left]) {
+                vx -= 0.1f * cosf(camera_yaw);
+                vz -= 0.1f * sinf(camera_yaw);
+            }
+
+            if (input[input_Right]) {
+                vx += 0.1f * cosf(camera_yaw);
+                vz += 0.1f * sinf(camera_yaw);
+            }
+
+            if (input[input_Forth]) {
+                vx += 0.1f * sinf(camera_yaw);
+                vz -= 0.1f * cosf(camera_yaw);
+            }
+
+            if (input[input_Back]) {
+                vx -= 0.1f * sinf(camera_yaw);
+                vz += 0.1f * cosf(camera_yaw);
+            }
+
+            if (input[input_Up]) {
+                camera_pos.y += 0.1f * speed;
+            }
+
+            if (input[input_Down]) {
+                camera_pos.y -= 0.1f * speed;
+            }
+
+            camera_pos.x += vx * speed;
+            camera_pos.z += vz * speed;
+        }
+
+
         /* rendering */
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -165,7 +248,7 @@ int bagE_main(int argc, char *argv[])
             (float)window_width,
             (float)window_height,
             0.1f,
-            100.0f /* NOTE: for now so the map doesn't clip */
+            100.0f
         );
 
         matrix_t vp = matrix_multiply(proj, view);
@@ -186,12 +269,12 @@ int bagE_main(int argc, char *argv[])
         model_rot += dt;
 
         glUseProgram(texture_program);
-        glBindVertexArray(head_model.vao);
-        glBindTextureUnit(0, stone_texture);
+        glBindVertexArray(head_object.vao);
+        glBindTextureUnit(0, atlas_texture);
 
         glProgramUniformMatrix4fv(texture_program, 0, 1, false, model.data);
 
-        glDrawElements(GL_TRIANGLES, head_model.index_count, GL_UNSIGNED_INT, NULL);
+        glDrawElements(GL_TRIANGLES, head_object.index_count, GL_UNSIGNED_INT, NULL);
 
 
         /* overlay */
@@ -252,9 +335,17 @@ int bagE_eventHandler(bagE_Event *event)
             down = true;
             /* fallthrough */
         case bagE_EventMouseButtonUp: {
+            /*
             bagE_MouseButton mb = event->data.mouseButton;
 
-            // editor_handle_mouse_button(&editor, 100, 100, mb, down);
+            if (editor_handle_mouse_button(&editor, 100, 100, mb, down))
+                break;
+            */
+
+            if (!down && !free_look) {
+                free_look = !free_look;
+                bagE_setHiddenCursor(free_look);
+            }
         } break;
 
         case bagE_EventKeyDown: 
@@ -263,7 +354,7 @@ int bagE_eventHandler(bagE_Event *event)
         case bagE_EventKeyUp: {
             bagE_Key *key = &(event->data.key);
             switch (key->key) {
-                case KEY_F11:
+                case KEY_F11: {
                     if (down) {
                         if(!f11_down) {
                             f11_down = true;
@@ -273,10 +364,33 @@ int bagE_eventHandler(bagE_Event *event)
                     } else {
                         f11_down = false;
                     }
-                    break;
+                } break;
+
+                case KEY_ESCAPE: {
+                    if (!down && free_look) {
+                        free_look = false;
+                        bagE_setHiddenCursor(false);
+                    }
+                } break;
+
+                case KEY_SPACE:      { input[input_Up]    = down; } break;
+                case KEY_SHIFT_LEFT: { input[input_Down]  = down; } break;
+                case KEY_W:          { input[input_Forth] = down; } break;
+                case KEY_S:          { input[input_Back]  = down; } break;
+                case KEY_A:          { input[input_Left]  = down; } break;
+                case KEY_D:          { input[input_Right] = down; } break;
             }
 
             // editor_handle_key(&editor, *key, down);
+        } break;
+
+        case bagE_EventMouseMotion: {
+            bagE_MouseMotion mm = event->data.mouseMotion;
+
+            if (free_look) {
+                camera_yaw   += mm.x * look_sensitivity;
+                camera_pitch += mm.y * look_sensitivity;
+            }
         } break;
 
         case bagE_EventTextUTF8: {
@@ -284,7 +398,7 @@ int bagE_eventHandler(bagE_Event *event)
         } break;
 
         case bagE_EventMousePosition: {
-            bagE_Mouse m = event->data.mouse;
+            // bagE_Mouse m = event->data.mouse;
             // editor_handle_mouse_position(&editor, 100, 100, m);
         } break;
 
