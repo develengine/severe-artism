@@ -419,6 +419,7 @@ texture_data_t create_texture_atlas(texture_data_t *textures, rect_t *views, int
     return res;
 }
 
+
 void model_map_textures_to_view(model_data_t *data, frect_t view)
 {
     for (int i = 0; i < data->vertex_count; ++i) {
@@ -426,3 +427,4 @@ void model_map_textures_to_view(model_data_t *data, frect_t view)
         data->vertices[i].textures[1] = view.y + view.h * data->vertices[i].textures[1];
     }
 }
+

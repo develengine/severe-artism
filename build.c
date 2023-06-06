@@ -22,6 +22,7 @@ const char *source_files[] = {
     "src/editor.c",
     "src/obj_parser.c",
     "src/generator.c",
+    "src/l_system.c",
 
     NULL
 };

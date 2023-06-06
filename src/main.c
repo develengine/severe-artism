@@ -8,9 +8,7 @@
 #include "gui.h"
 #include "editor.h"
 #include "generator.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "l_system.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,12 +49,6 @@ static bool input[INPUT_COUNT] = {0};
 
 static color_t foreground = { 1.0f, 1.0f, 1.0f, 1.0f };
 static color_t background = { 0.2f, 0.2f, 0.2f, 0.7f };
-
-typedef struct
-{
-    int x, y, w, h;
-    float time;
-} button_t;
 
 static editor_t editor;
 
@@ -141,12 +133,19 @@ int bagE_main(int argc, char *argv[])
 
     model_builder_t builder = {0};
 
-    model_builder_merge(&builder, cylinder,   matrix_translation( 0.0f, 0.0f, 0.0f));
-    model_builder_merge(&builder, sphere,     matrix_translation( 0.0f, 2.0f, 0.0f));
-    model_builder_merge(&builder, head_model, matrix_translation( 1.0f, 0.0f, 0.0f));
-    model_builder_merge(&builder, head_model, matrix_translation(-1.0f, 0.5f, 0.0f));
+    model_builder_merge(&builder, cylinder,
+                        matrix_translation( 0.0f, 0.0f, 0.0f));
 
-    model_object_t head_object = create_model_object(builder.data);
+    model_builder_merge(&builder, sphere,
+                        matrix_translation( 0.0f, 2.0f, 0.0f));
+
+    model_builder_merge(&builder, head_model,
+                        matrix_translation( 1.0f, 0.0f, 0.0f));
+
+    model_builder_merge(&builder, head_model,
+                        matrix_translation(-1.0f, 0.5f, 0.0f));
+
+    model_object_t main_object = create_model_object(builder.data);
 
     unsigned cam_ubo = create_buffer_object(
         sizeof(matrix_t) * 3 + sizeof(float) * 4,
@@ -269,12 +268,12 @@ int bagE_main(int argc, char *argv[])
         model_rot += dt;
 
         glUseProgram(texture_program);
-        glBindVertexArray(head_object.vao);
+        glBindVertexArray(main_object.vao);
         glBindTextureUnit(0, atlas_texture);
 
         glProgramUniformMatrix4fv(texture_program, 0, 1, false, model.data);
 
-        glDrawElements(GL_TRIANGLES, head_object.index_count, GL_UNSIGNED_INT, NULL);
+        glDrawElements(GL_TRIANGLES, main_object.index_count, GL_UNSIGNED_INT, NULL);
 
 
         /* overlay */
