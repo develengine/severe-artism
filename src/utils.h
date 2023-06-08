@@ -17,7 +17,7 @@
     do {                                                                            \
         fprintf(stderr, "%s:%d: Unreachable line reached.\n", __FILE__, __LINE__);  \
         exit(666);                                                                  \
-    while (0)
+    } while (0)
 #else
     #ifdef _WIN32
         #define unreachable()   assume(0)

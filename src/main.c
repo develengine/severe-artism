@@ -102,6 +102,29 @@ int bagE_main(int argc, char *argv[])
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
 
 
+    /* systo */
+    l_system_t sys = {0};
+
+    // type
+    l_basic_t types[] = { l_basic_Float, l_basic_Int };
+    unsigned type = l_system_add_type(&sys, types, length(types));
+    printf("type: %d, param_type_count: %d, type_count: %d\n",
+           type, sys.param_type_count, sys.type_count);
+
+    l_instruction_t code[] = {
+        { .id = l_inst_Value, .op = { .type = l_basic_Int, .data.integer = 3 } },
+        { .id = l_inst_Value, .op = { .type = l_basic_Int, .data.integer = 2 } },
+        { .id = l_inst_Add },
+    };
+    l_expr_t expr = l_system_add_code(&sys, code, length(code));
+    printf("expr.index: %d, expr.count: %d, instruction_count: %d\n",
+           expr.index, expr.count, sys.instruction_count);
+
+    l_value_t val = l_evaluate(&sys, expr, 0, true);
+    printf("val.type: %s, val.data.integer: %d, val.data.floating: %f\n",
+           l_basic_name(val.type), val.data.integer, val.data.floating);
+
+
     /* crap goes here */
     unsigned texture_program = load_program(
             "shaders/texture.vert.glsl",
