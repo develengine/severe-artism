@@ -88,7 +88,7 @@ typedef struct
 typedef struct
 {
     unsigned type;
-    l_expr_t expr;
+    l_expr_t predicate;
 } l_match_t;
 
 typedef struct
@@ -135,6 +135,9 @@ typedef struct
     l_result_t *results;
     unsigned result_count, result_capacity;
 
+    // TODO: Optimize type matching.
+    //       We can make an offset list on top for
+    //       individual type indices.
     l_rule_t *rules;
     unsigned rule_count, rule_capacity;
 
@@ -154,9 +157,13 @@ void l_system_add_rule(l_system_t *sys,
 void l_system_empty(l_system_t *sys);
 void l_system_append(l_system_t *sys, unsigned type, l_value_t *params);
 
+l_value_t l_evaluate(l_system_t *sys,
+                     l_expr_t expr,
+                     unsigned type_index,
+                     unsigned data_index,
+                     bool compute);
+
 void l_system_update(l_system_t *sys);
 void l_system_print(l_system_t *sys);
-
-l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool compute);
 
 #endif // L_SYSTEM

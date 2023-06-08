@@ -182,7 +182,6 @@ void l_system_append(l_system_t *sys, unsigned type, l_value_t *params)
     unsigned param_count = sys->types[type].params_count;
     unsigned data_index = sys->data_lengths[sys->id];
 
-
     unsigned new_data_length = data_index + param_count;
 
     if (new_data_length > sys->data_capacities[sys->id]) {
@@ -220,20 +219,187 @@ void l_system_append(l_system_t *sys, unsigned type, l_value_t *params)
 }
 
 
+void l_system_update(l_system_t *sys)
+{
+    unsigned next_id = !sys->id;
+
+    sys->data_lengths[next_id] = 0;
+    sys->lengths[next_id] = 0;
+
+    for (unsigned sym_id = 0; sym_id < sys->lengths[sys->id]; ++sym_id) {
+        l_symbol_t symbol = sys->buffers[sys->id][sym_id];
+
+        for (unsigned rule_id = 0; rule_id < sys->rule_count; ++rule_id) {
+            l_rule_t rule = sys->rules[rule_id];
+
+            if (rule.left.type != symbol.type)
+                continue;
+
+            l_value_t res = l_evaluate(sys,
+                                       rule.left.predicate,
+                                       rule.left.type,
+                                       symbol.data_index,
+                                       true);
+
+            assert(res.type == l_basic_Bool);
+
+            if (!res.data.boolean)
+                continue;
+
+            unsigned acc_param_count = 0;
+
+            for (unsigned i = 0; i < rule.right_size; ++i) {
+                l_type_t type = sys->types[sys->results[rule.right_index + i].type];
+                acc_param_count += type.params_count;
+            }
+
+            unsigned new_data_length = sys->data_lengths[next_id] + acc_param_count;
+
+            if (new_data_length > sys->data_capacities[next_id]) {
+                unsigned capacity = sys->data_capacities[next_id];
+
+                if (capacity == 0) {
+                    capacity = 4096 / sizeof(l_value_t);
+                }
+
+                while (new_data_length > capacity) {
+                    capacity *= 2;
+                }
+
+                sys->data_buffers[next_id] = realloc(sys->data_buffers[next_id],
+                                                     capacity * sizeof(l_value_t));
+
+                sys->data_capacities[next_id] = capacity;
+            }
+
+            unsigned new_length = sys->lengths[next_id] + rule.right_size;
+
+            if (new_length > sys->capacities[next_id]) {
+                unsigned capacity = sys->capacities[next_id];
+
+                if (capacity == 0) {
+                    capacity = 4096 / sizeof(l_symbol_t);
+                }
+
+                while (new_length > capacity) {
+                    capacity *= 2;
+                }
+
+                sys->buffers[next_id] = realloc(sys->buffers[next_id],
+                                                capacity * sizeof(l_symbol_t));
+
+                sys->capacities[next_id] = capacity;
+            }
+
+            unsigned symbol_index = sys->lengths[next_id];
+
+            for (unsigned ri = 0; ri < rule.right_size; ++ri) {
+                unsigned data_index = sys->data_lengths[next_id];
+
+                l_result_t result = sys->results[rule.right_index + ri];
+
+                l_type_t type = sys->types[result.type];
+                l_basic_t *param_types = sys->param_types + type.params_index;
+
+                for (unsigned pi = 0; pi < type.params_count; ++pi) {
+                    l_value_t value = l_evaluate(sys,
+                                                 sys->params[result.params_index + pi],
+                                                 result.type,
+                                                 symbol.data_index,
+                                                 true);
+
+                    assert(value.type == param_types[pi]);
+
+                    sys->data_buffers[next_id][data_index + pi] = value;
+                }
+
+                sys->data_lengths[next_id] += type.params_count;
+
+                sys->buffers[next_id][symbol_index] = (l_symbol_t) {
+                    .type = result.type,
+                    .data_index = data_index
+                };
+
+                ++symbol_index;
+            }
+
+            sys->lengths[next_id] = new_length;
+        }
+    }
+
+    sys->id = next_id;
+}
+
+
+void l_system_print(l_system_t *sys)
+{
+    for (unsigned i = 0; i < sys->lengths[sys->id]; ++i) {
+        l_symbol_t sym = sys->buffers[sys->id][i];
+
+        l_type_t type = sys->types[sym.type];
+        l_basic_t *param_types = sys->param_types + type.params_index;
+        unsigned param_count = type.params_count;
+
+        l_value_t *data = sys->data_buffers[sys->id] + sym.data_index;
+
+        printf("%d (", sym.type);
+
+        for (unsigned ti = 0; ti < param_count; ++ti) {
+            l_basic_t p_type = param_types[ti];
+            l_value_t value = data[ti];
+
+            assert(value.type == p_type);
+
+            switch (p_type) {
+                case l_basic_Int: {
+                    printf("%d: ", value.data.integer);
+                } break;
+
+                case l_basic_Float: {
+                    printf("%f: ", value.data.floating);
+                } break;
+
+                case l_basic_Bool: {
+                    printf("%s: ", value.data.boolean ? "true" : "false");
+                } break;
+
+                case l_basic_Mat4: {
+                    printf("<mat4>: ");
+                } break;
+
+                default: unreachable();
+            }
+
+            printf("%s, ", l_basic_name(p_type));
+        }
+
+        printf(")\n");
+    }
+
+    printf("\n");
+}
+
+
 // NOTE: `compute` flag determines if we also compute the values or not.
 //       If `compute` is 'false', only the `type` attribute is valid.
 //       If it is 'true' the `data` is valid as well.
 //
 //       This is useful for example to avoid divide by zero on integer values
 //       when doing type checking.
-l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool compute)
+l_value_t l_evaluate(l_system_t *sys,
+                     l_expr_t expr,
+                     unsigned type_index,
+                     unsigned data_index,
+                     bool compute)
 {
     l_value_t *params = sys->data_buffers[sys->id] + data_index;
     l_instruction_t *code = sys->instructions + expr.index;
 
+    l_type_t type = sys->types[type_index];
+    l_basic_t *param_types = sys->param_types + type.params_index;
+
     for (unsigned i = 0; i < expr.count; ++i) {
         l_instruction_t inst = code[i];
-        
 
         switch (inst.id) {
             case l_inst_Value: {
@@ -241,15 +407,22 @@ l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool c
             } break;
 
             case l_inst_Param: {
-                l_value_t val = params[inst.op.data.integer];
+                unsigned param_index = inst.op.data.integer;
+
+                assert(param_index < type.params_count);
+
+                l_value_t val = params[param_index];
+
+                assert(val.type == param_types[param_index]);
+
                 safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, val);
             } break;
 
             case l_inst_Add: {
                 assert(sys->eval_stack_size >= 2);
 
-                l_value_t b = sys->eval_stack[sys->eval_stack_size-- - 1];
-                l_value_t a = sys->eval_stack[sys->eval_stack_size-- - 1];
+                l_value_t b = sys->eval_stack[--(sys->eval_stack_size)];
+                l_value_t a = sys->eval_stack[--(sys->eval_stack_size)];
 
                 assert(a.type != l_basic_Bool);
                 assert(a.type != l_basic_Mat4);
@@ -264,7 +437,7 @@ l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool c
 
                 if (compute) {
                     if (has_float) {
-                        if      (a.type == l_basic_Int) {
+                        if (a.type == l_basic_Int) {
                             res.data.floating = (float)(a.data.integer) + b.data.floating;
                         }
                         else if (b.type == l_basic_Int) {
@@ -285,8 +458,8 @@ l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool c
             case l_inst_Sub: {
                 assert(sys->eval_stack_size >= 2);
 
-                l_value_t b = sys->eval_stack[sys->eval_stack_size-- - 1];
-                l_value_t a = sys->eval_stack[sys->eval_stack_size-- - 1];
+                l_value_t b = sys->eval_stack[--(sys->eval_stack_size)];
+                l_value_t a = sys->eval_stack[--(sys->eval_stack_size)];
 
                 assert(a.type != l_basic_Bool);
                 assert(a.type != l_basic_Mat4);
@@ -301,7 +474,7 @@ l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool c
 
                 if (compute) {
                     if (has_float) {
-                        if      (a.type == l_basic_Int) {
+                        if (a.type == l_basic_Int) {
                             res.data.floating = (float)(a.data.integer) - b.data.floating;
                         }
                         else if (b.type == l_basic_Int) {
@@ -330,17 +503,5 @@ l_value_t l_evaluate(l_system_t *sys, l_expr_t expr, unsigned data_index, bool c
     l_value_t res = sys->eval_stack[sys->eval_stack_size - 1];
     sys->eval_stack_size = 0;
     return res;
-}
-
-
-void l_system_update(l_system_t *sys)
-{
-    (void)sys;
-}
-
-
-void l_system_print(l_system_t *sys)
-{
-    (void)sys;
 }
 

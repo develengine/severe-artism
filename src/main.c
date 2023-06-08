@@ -105,7 +105,6 @@ int bagE_main(int argc, char *argv[])
     /* systo */
     l_system_t sys = {0};
 
-    // type
     l_basic_t types[] = { l_basic_Float, l_basic_Int };
     unsigned type = l_system_add_type(&sys, types, length(types));
     printf("type: %d, param_type_count: %d, type_count: %d\n",
@@ -120,10 +119,50 @@ int bagE_main(int argc, char *argv[])
     printf("expr.index: %d, expr.count: %d, instruction_count: %d\n",
            expr.index, expr.count, sys.instruction_count);
 
-    l_value_t val = l_evaluate(&sys, expr, 0, true);
+    l_value_t val = l_evaluate(&sys, expr, type, 0, true);
     printf("val.type: %s, val.data.integer: %d, val.data.floating: %f\n",
            l_basic_name(val.type), val.data.integer, val.data.floating);
 
+    l_value_t params[] = {
+        { .type = l_basic_Float, .data.floating = 1.4f },
+        { .type = l_basic_Int,   .data.integer  = 3 },
+    };
+    l_system_append(&sys, type, params);
+    l_system_print(&sys);
+
+    l_instruction_t predicate[] = {
+        { .id = l_inst_Value, .op = { .type = l_basic_Bool, .data.boolean = true } },
+    };
+    l_match_t left = {
+        .type = type,
+        .predicate = l_system_add_code(&sys, predicate, length(predicate)),
+    };
+    unsigned param_types[] = { type, type };
+    l_instruction_t init_float[] = {
+        { .id = l_inst_Value, .op = { .type = l_basic_Float, .data.floating = 0.5 } },
+        { .id = l_inst_Param, .op = { .type = l_basic_Int,   .data.integer  = 0 } },
+        { .id = l_inst_Add },
+    };
+    l_instruction_t init_int[] = {
+        { .id = l_inst_Param, .op = { .type = l_basic_Int, .data.integer = 1 } },
+        { .id = l_inst_Value, .op = { .type = l_basic_Int, .data.integer = 1 } },
+        { .id = l_inst_Sub },
+    };
+    l_expr_t initializer[] = {
+        /* 0 */
+        l_system_add_code(&sys, init_float, length(init_float)),
+        l_system_add_code(&sys, init_int, length(init_int)),
+        /* 1 */
+        l_system_add_code(&sys, init_float, length(init_float)),
+        l_system_add_code(&sys, init_int, length(init_int)),
+    };
+    l_system_add_rule(&sys, left, param_types, initializer, length(param_types));
+    printf("rule_count: %d, result_count: %d, param_count: %d\n",
+           sys.rule_count, sys.result_count, sys.param_count);
+
+    l_system_update(&sys);
+    l_system_update(&sys);
+    l_system_print(&sys);
 
     /* crap goes here */
     unsigned texture_program = load_program(

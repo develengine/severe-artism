@@ -73,14 +73,8 @@ do {                                                                            
 do {                                                                        \
     if ((size) == (capacity)) {                                             \
         capacity = (capacity) ? (capacity) * 2 : 1;                         \
-        void *new_ptr = realloc(buffer, sizeof(*(buffer)) * (capacity));    \
-        if (!new_ptr) {                                                     \
-            new_ptr = malloc(sizeof(*(buffer)) * (capacity));               \
-            malloc_check(new_ptr);                                          \
-            memcpy(new_ptr, buffer, sizeof(*(buffer)) * (size));            \
-            free(buffer);                                                   \
-        }                                                                   \
-        buffer = new_ptr;                                                   \
+        buffer = realloc(buffer, sizeof(*(buffer)) * (capacity));           \
+        malloc_check(buffer);                                               \
     }                                                                       \
     buffer[size] = item;                                                    \
     ++(size);                                                               \
