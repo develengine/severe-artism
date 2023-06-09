@@ -16,3 +16,20 @@ Options:
 - Fullscreen
 
 
+
+
+res res_name = cilynder(...)
+
+def type_name(n: int, s: float) = {
+    res_name(rotate_x(s)),
+}
+
+rule type_name(n > 0) {
+    type_name(n - 1, s + PI / 4),
+    type_name(n - 1, s - PI / 4)
+}
+
+
+
+
+

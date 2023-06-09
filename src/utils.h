@@ -95,6 +95,21 @@ do {                                                                        \
 } while (0)
 
 /* arguments must be lvalues, except for `amount` */
+#define safe_reserve(buffer, size, capacity, amount)                    \
+do {                                                                    \
+    if ((size) + (amount) > (capacity)) {                               \
+        if ((capacity) == 0) {                                          \
+            capacity = 4096 / sizeof(*(buffer));                        \
+        }                                                               \
+        while ((size) + (amount) > (capacity)) {                        \
+            capacity *= 2;                                              \
+        }                                                               \
+        buffer = realloc(buffer, sizeof(*(buffer)) * (capacity));       \
+        malloc_check(buffer);                                           \
+    }                                                                   \
+} while (0)
+
+/* arguments must be lvalues, except for `amount` */
 #define queue_init(queue, capacity, start, end, amount) \
 do {                                                    \
     assert(amount > 0);                                 \
