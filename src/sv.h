@@ -54,7 +54,7 @@ static inline sv_t sv_l(char *str)
 {
     sv_t res = { .begin = str, .end = str };
 
-    for (; res.end; ++res.end)
+    for (; *(res.end); ++res.end)
         ;;
 
     return res;

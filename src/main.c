@@ -1,14 +1,17 @@
 #include "bag_engine.h"
 #include "bag_keys.h"
 #include "bag_time.h"
+
 #include "utils.h"
 #include "linalg.h"
 #include "res.h"
 #include "core.h"
 #include "gui.h"
+
 #include "editor.h"
 #include "generator.h"
 #include "l_system.h"
+#include "parser.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,7 +105,49 @@ int bagE_main(int argc, char *argv[])
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
 
 
+    /* parso */
+    char parse_text[] =
+"res res_name=cilynder(...)\n"
+"res res_blame=model(\"\\\"bruh lol.obj\\\"\")\n"
+"\n"
+"def type_name(n:int,s:float)={\n"
+"    res_name(rotate_x(s)),\n"
+"}\n"
+"\n"
+"# this is a comment\n"
+"\n"
+"#* multiline\n"
+"   comment *# \n"
+"\n"
+"rule type_name(n>=0)#* shit *#{\n"
+"    type_name(n-1,s+PI/4.0),#lol\n"
+"    type_name(n-1,s-PI/4.0)\n"
+"}\n";
+
+    tokenizer_t toki = {
+        .begin = parse_text,
+        .pos = parse_text,
+        .end = parse_text + length(parse_text) - 1,
+    };
+
+    for (;;) {
+        token_t token = tokenizer_next(&toki, false);
+
+        printf("(%s, \"", token_type_to_str(token.type));
+        sv_fwrite(token.data, stdout);
+        printf("\")\n");
+
+        if (token.type == token_type_Error) {
+            printf("    line: %llu\n", token.meta.err.line);
+        }
+
+        if (token.type == token_type_Empty)
+            break;
+    }
+
+
     /* systo */
+#if 0
     l_system_t sys = {0};
 
     l_basic_t types[] = { l_basic_Float, l_basic_Int };
@@ -163,6 +208,7 @@ int bagE_main(int argc, char *argv[])
     l_system_update(&sys);
     l_system_update(&sys);
     l_system_print(&sys);
+#endif
 
     /* crap goes here */
     unsigned texture_program = load_program(

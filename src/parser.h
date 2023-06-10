@@ -2,6 +2,7 @@
 #define PARSER_H
 
 #include "sv.h"
+#include "l_system.h"
 
 
 typedef enum
@@ -43,15 +44,6 @@ typedef enum
 
 typedef enum
 {
-    token_lit_Decimal,
-    token_lit_Fraction,
-    token_lit_Boolean,
-
-    TOKEN_LIT_COUNT
-} token_lit_t;
-
-typedef enum
-{
     token_op_Plus,
     token_op_Minus,
     token_op_Times,
@@ -63,6 +55,7 @@ typedef enum
     token_op_LessEq,
     token_op_MoreEq,
     token_op_Equal,
+    token_op_NotEqual,
 
     token_op_And,
     token_op_Or,
@@ -71,20 +64,60 @@ typedef enum
     TOKEN_OP_COUNT
 } token_op_t;
 
+typedef enum
+{
+    token_lit_String,
+    token_lit_Decimal,
+    token_lit_Fraction,
+    token_lit_Boolean,
+
+    TOKEN_LIT_TYPE_COUNT
+} token_lit_t;
+
+typedef struct
+{
+    size_t line, pos;
+} token_error_t;
+
+typedef struct
+{
+    bool success;
+
+    size_t line, pos;
+    sv_t message;
+} parse_result_t;
+
 typedef struct
 {
     token_type_t type;
-    unsigned meta;
     sv_t data;
+
+    // TODO: Give all tokens line numbers and positions.
+
+    union
+    {
+        char sep;
+        token_op_t op;
+        token_lit_t lit;
+        token_kw_t kw;
+
+        token_error_t err;
+    } meta;
 } token_t;
 
 typedef struct
 {
-    char *text;
-    size_t pos, size;
+    char *begin, *pos, *end;
     size_t ln, ln_pos;
+
+    bool has_stored;
+    token_t stored;
 } tokenizer_t;
 
-token_t tokenizer_next(tokenizer_t *toki);
+token_t tokenizer_next(tokenizer_t *toki, bool ignore_comments);
+
+void tokenizer_store(tokenizer_t *toki, token_t token);
+
+const char *token_type_to_str(token_type_t type);
 
 #endif // PARSER_H
