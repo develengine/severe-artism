@@ -32,12 +32,12 @@ typedef enum
     token_kw_Bool,
     token_kw_Mat,
 
-    token_kw_PI,
-    token_kw_PHI,
-
     token_kw_Rotation,
     token_kw_Scale,
     token_kw_Position,
+
+    token_kw_PI,
+    token_kw_PHI,
 
     TOKEN_KW_COUNT,
 } token_kw_t;
@@ -76,14 +76,9 @@ typedef enum
 
 typedef struct
 {
-    size_t line, pos;
-} token_error_t;
-
-typedef struct
-{
     bool success;
 
-    size_t line, pos;
+    size_t line, col;
     sv_t message;
 } parse_result_t;
 
@@ -91,8 +86,7 @@ typedef struct
 {
     token_type_t type;
     sv_t data;
-
-    // TODO: Give all tokens line numbers and positions.
+    size_t ln;
 
     union
     {
@@ -100,8 +94,6 @@ typedef struct
         token_op_t op;
         token_lit_t lit;
         token_kw_t kw;
-
-        token_error_t err;
     } meta;
 } token_t;
 
@@ -119,5 +111,14 @@ token_t tokenizer_next(tokenizer_t *toki, bool ignore_comments);
 void tokenizer_store(tokenizer_t *toki, token_t token);
 
 const char *token_type_to_str(token_type_t type);
+
+typedef struct
+{
+    parse_result_t res;
+    l_expr_t expr;
+} parse_expr_res_t;
+
+parse_expr_res_t parse_expression(tokenizer_t *toki, l_system_t *sys,
+                                  bool has_params, unsigned type);
 
 #endif // PARSER_H

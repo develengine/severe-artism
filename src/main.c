@@ -105,7 +105,34 @@ int bagE_main(int argc, char *argv[])
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
 
 
+    /* expo */
+#if 1
+    char parse_text[] =
+"1 + 2 - 3";
+
+    tokenizer_t toki = {
+        .begin = parse_text,
+        .pos = parse_text,
+        .end = parse_text + length(parse_text) - 1,
+    };
+
+    l_system_t sys = {0};
+
+    parse_expr_res_t ret = parse_expression(&toki, &sys, false, 0);
+
+    if (ret.res.success) {
+        for (unsigned i = 0; i < ret.expr.count; ++i) {
+            fprint_instruction(sys.instructions[ret.expr.index + i], stdout);
+        }
+    } else {
+        printf("%zd:%zd: ", ret.res.line, ret.res.col);
+        sv_fwrite(ret.res.message, stdout);
+    }
+#endif
+
+
     /* parso */
+#if 0
     char parse_text[] =
 "res res_name=cilynder(...)\n"
 "res res_blame=model(\"\\\"bruh lol.obj\\\"\")\n"
@@ -135,15 +162,12 @@ int bagE_main(int argc, char *argv[])
 
         printf("(%s, \"", token_type_to_str(token.type));
         sv_fwrite(token.data, stdout);
-        printf("\")\n");
-
-        if (token.type == token_type_Error) {
-            printf("    line: %llu\n", token.meta.err.line);
-        }
+        printf(", %zd\")\n", token.ln);
 
         if (token.type == token_type_Empty)
             break;
     }
+#endif
 
 
     /* systo */

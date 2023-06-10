@@ -72,7 +72,7 @@ do {                                                                            
 #define safe_push(buffer, size, capacity, item)                             \
 do {                                                                        \
     if ((size) == (capacity)) {                                             \
-        capacity = (capacity) ? (capacity) * 2 : 1;                         \
+        capacity = (capacity) ? (capacity) * 2 : 4096 / sizeof(*(buffer));  \
         buffer = realloc(buffer, sizeof(*(buffer)) * (capacity));           \
         malloc_check(buffer);                                               \
     }                                                                       \

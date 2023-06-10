@@ -269,6 +269,111 @@ void l_system_print(l_system_t *sys)
 //
 //       This is useful for example to avoid divide by zero on integer values
 //       when doing type checking.
+l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
+                                    l_value_t *params, unsigned param_count,
+                                    l_value_t *data_top, unsigned data_size,
+                                    bool compute)
+{
+    switch (inst.id) {
+        case l_inst_Value: {
+            return (l_eval_res_t) { inst.op };
+        } break;
+
+        case l_inst_Param: {
+            unsigned param_index = inst.op.data.integer;
+
+            assert(param_index < param_count);
+
+            l_value_t val = params[param_index];
+
+            return (l_eval_res_t) { val };
+        } break;
+
+        case l_inst_Add: {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            if (a.type == l_basic_Bool || b.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Addition of booleans is not allowed!" };
+
+            if (a.type == l_basic_Mat4 || b.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Addition of matrices is not allowed!" };
+
+            bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
+
+            l_value_t res = {
+                .type = has_float ? l_basic_Float : l_basic_Int,
+            };
+
+            if (compute) {
+                if (has_float) {
+                    if (a.type == l_basic_Int) {
+                        res.data.floating = (float)(a.data.integer) + b.data.floating;
+                    }
+                    else if (b.type == l_basic_Int) {
+                        res.data.floating = a.data.floating + (float)(b.data.integer);
+                    }
+                    else {
+                        res.data.floating = a.data.floating + b.data.floating;
+                    }
+                }
+                else {
+                    res.data.integer = a.data.integer + b.data.integer;
+                }
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_Sub: {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            if (a.type == l_basic_Bool || b.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Difference of booleans is not allowed!" };
+
+            if (a.type == l_basic_Mat4 || b.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Difference of matrices is not allowed!" };
+
+            bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
+
+            l_value_t res = {
+                .type = has_float ? l_basic_Float : l_basic_Int,
+            };
+
+            if (compute) {
+                if (has_float) {
+                    if (a.type == l_basic_Int) {
+                        res.data.floating = (float)(a.data.integer) - b.data.floating;
+                    }
+                    else if (b.type == l_basic_Int) {
+                        res.data.floating = a.data.floating - (float)(b.data.integer);
+                    }
+                    else {
+                        res.data.floating = a.data.floating - b.data.floating;
+                    }
+                }
+                else {
+                    res.data.integer = a.data.integer - b.data.integer;
+                }
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        default: {
+            return (l_eval_res_t) { .error = "Unimplemented instruction!" };
+        }
+    }
+
+    unreachable();
+}
+
+
 l_value_t l_evaluate(l_system_t *sys,
                      l_expr_t expr,
                      unsigned type_index,
@@ -279,109 +384,25 @@ l_value_t l_evaluate(l_system_t *sys,
     l_instruction_t *code = sys->instructions + expr.index;
 
     l_type_t type = sys->types[type_index];
-    l_basic_t *param_types = sys->param_types + type.params_index;
 
     for (unsigned i = 0; i < expr.count; ++i) {
         l_instruction_t inst = code[i];
 
-        switch (inst.id) {
-            case l_inst_Value: {
-                safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, inst.op);
-            } break;
+        l_eval_res_t res = l_evaluate_instruction(inst, params, type.params_count,
+                                                  sys->eval_stack + sys->eval_stack_size - 1,
+                                                  sys->eval_stack_size,
+                                                  compute);
 
-            case l_inst_Param: {
-                unsigned param_index = inst.op.data.integer;
+        // TODO: Propagate properly.
+        //       Important especially for divide by 0.
+        assert(!res.error);
 
-                assert(param_index < type.params_count);
+        sys->eval_stack_size -= res.eaten;
 
-                l_value_t val = params[param_index];
-
-                assert(val.type == param_types[param_index]);
-
-                safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, val);
-            } break;
-
-            case l_inst_Add: {
-                assert(sys->eval_stack_size >= 2);
-
-                l_value_t b = sys->eval_stack[--(sys->eval_stack_size)];
-                l_value_t a = sys->eval_stack[--(sys->eval_stack_size)];
-
-                assert(a.type != l_basic_Bool);
-                assert(a.type != l_basic_Mat4);
-                assert(b.type != l_basic_Bool);
-                assert(b.type != l_basic_Mat4);
-
-                bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
-
-                l_value_t res = {
-                    .type = has_float ? l_basic_Float : l_basic_Int,
-                };
-
-                if (compute) {
-                    if (has_float) {
-                        if (a.type == l_basic_Int) {
-                            res.data.floating = (float)(a.data.integer) + b.data.floating;
-                        }
-                        else if (b.type == l_basic_Int) {
-                            res.data.floating = a.data.floating + (float)(b.data.integer);
-                        }
-                        else {
-                            res.data.floating = a.data.floating + b.data.floating;
-                        }
-                    }
-                    else {
-                        res.data.integer = a.data.integer + b.data.integer;
-                    }
-                }
-
-                safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, res);
-            } break;
-
-            case l_inst_Sub: {
-                assert(sys->eval_stack_size >= 2);
-
-                l_value_t b = sys->eval_stack[--(sys->eval_stack_size)];
-                l_value_t a = sys->eval_stack[--(sys->eval_stack_size)];
-
-                assert(a.type != l_basic_Bool);
-                assert(a.type != l_basic_Mat4);
-                assert(b.type != l_basic_Bool);
-                assert(b.type != l_basic_Mat4);
-
-                bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
-
-                l_value_t res = {
-                    .type = has_float ? l_basic_Float : l_basic_Int,
-                };
-
-                if (compute) {
-                    if (has_float) {
-                        if (a.type == l_basic_Int) {
-                            res.data.floating = (float)(a.data.integer) - b.data.floating;
-                        }
-                        else if (b.type == l_basic_Int) {
-                            res.data.floating = a.data.floating - (float)(b.data.integer);
-                        }
-                        else {
-                            res.data.floating = a.data.floating - b.data.floating;
-                        }
-                    }
-                    else {
-                        res.data.integer = a.data.integer - b.data.integer;
-                    }
-                }
-
-                safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, res);
-            } break;
-
-            default: {
-                assert(0 && "unknown instruction");
-            }
-        }
+        safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, res.val);
     }
 
-    assert(sys->eval_stack_size >= 1);
+    assert(sys->eval_stack_size == 1);
 
     l_value_t res = sys->eval_stack[sys->eval_stack_size - 1];
     sys->eval_stack_size = 0;
