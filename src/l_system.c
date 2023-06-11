@@ -1,5 +1,7 @@
 #include "l_system.h"
 
+#include "generator.h"
+
 #include <stdio.h>
 
 
@@ -630,7 +632,11 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
             if (a.type == l_basic_Mat4)
                 return (l_eval_res_t) { .error = "Can't cast matrix to another type!" };
 
-            l_value_t res = { .type = a.type };
+            l_value_t res = {0};
+
+            if      (inst.id == l_inst_CastInt)   res.type = l_basic_Int;
+            else if (inst.id == l_inst_CastFloat) res.type = l_basic_Float;
+            else                                  res.type = l_basic_Bool;
 
             if (compute) {
                 if (inst.id == l_inst_CastInt) {
@@ -651,6 +657,42 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
             }
 
             return (l_eval_res_t) { res, 1 };
+        } break;
+
+        case l_inst_Rotation: /* fallthrough */
+        case l_inst_Scale:    /* fallthrough */
+        case l_inst_Position:
+        {
+            assert(data_size >= 3);
+
+            l_value_t x = data_top[-2];
+            l_value_t y = data_top[-1];
+            l_value_t z = data_top[ 0];
+
+            if (x.type != l_basic_Float || y.type != l_basic_Float || z.type != l_basic_Float)
+                return (l_eval_res_t) { .error = "Matrix functions can take only float values!" };
+
+            l_value_t res = { .type = l_basic_Mat4 };
+
+            if (compute) {
+                if (inst.id == l_inst_Position) {
+                    res.data.matrix = matrix_translation(x.data.floating,
+                                                         y.data.floating,
+                                                         z.data.floating);
+                }
+                else if (inst.id == l_inst_Scale) {
+                    res.data.matrix = matrix_scale(x.data.floating,
+                                                   y.data.floating,
+                                                   z.data.floating);
+                }
+                else {
+                    res.data.matrix = matrix_multiply(matrix_rotation_z(z.data.floating),
+                                          matrix_multiply(matrix_rotation_y(y.data.floating),
+                                              matrix_rotation_x(x.data.floating)));
+                }
+            }
+
+            return (l_eval_res_t) { res, 3 };
         } break;
 
         case l_inst_Noop: {
@@ -710,3 +752,56 @@ l_eval_res_t l_evaluate(l_system_t *sys,
     return (l_eval_res_t) { res };
 }
 
+
+l_build_t l_system_build(l_system_t *sys)
+{
+    if (sys->texture_count == 0)
+        return (l_build_t) { .error = "No textures loaded!" };
+
+    rect_t *views = malloc(sys->texture_count * sizeof(rect_t));;
+
+    texture_data_t atlas_data = create_texture_atlas(sys->textures, views, sys->texture_count);
+    unsigned atlas_texture = create_texture_object(atlas_data);
+
+    for (unsigned i = 0; i < sys->resource_count; ++i) {
+        l_resource_t *res = sys->resources + i;
+        model_map_textures_to_view(&(res->model),
+                                   frect_make(views[res->texture_index],
+                                              atlas_data.width, atlas_data.height));
+    }
+
+
+    model_builder_t builder = {0};
+
+    for (unsigned i = 0; i < sys->lengths[sys->id]; ++i) {
+        l_symbol_t sym = sys->buffers[sys->id][i];
+        l_type_t type = sys->types[sym.type];
+
+        for (unsigned lid = 0; lid < type.load_count; ++lid) {
+            l_type_load_t load = sys->type_loads[type.load_index + lid];
+            
+            l_eval_res_t res = l_evaluate(sys, load.expr, true, sym.type, sym.data_index, true);
+
+            if (res.error)
+                return (l_build_t) { .error = res.error };
+
+            assert(res.val.type == l_basic_Mat4);
+
+            model_builder_merge(&builder,
+                                sys->resources[load.resource_index].model,
+                                res.val.data.matrix);
+        }
+    }
+
+    if (builder.data.index_count == 0)
+        return (l_build_t) { .error = "Empty object!" };
+
+    model_object_t object = create_model_object(builder.data);
+
+    free_model_data(builder.data);
+
+    return (l_build_t) {
+        .atlas = atlas_texture,
+        .object = object,
+    };
+}

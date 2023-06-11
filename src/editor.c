@@ -254,6 +254,9 @@ bool editor_handle_mouse_button(editor_t *editor, int x, int y,
         editor->selection_start = index;
     }
     else {
+        if (!editor->selecting && !editor->mouse_down)
+            return false;
+
         editor->mouse_down = false;
 
         if (editor->selection_start == editor->cursor_index) {

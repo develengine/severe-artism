@@ -15,9 +15,9 @@
 
 #include "bag_engine.h"
 
-#define EDITOR_WIDTH  60
-#define EDITOR_HEIGHT 20
-#define EDITOR_SCALE 16
+#define EDITOR_WIDTH  100
+#define EDITOR_HEIGHT 40
+#define EDITOR_SCALE 8
 
 
 typedef struct

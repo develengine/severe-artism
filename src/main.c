@@ -18,6 +18,7 @@
 #include <time.h>
 #include <stdbool.h>
 
+
 static bool running = true;
 
 static int window_width  = 1080;
@@ -30,7 +31,7 @@ static float fov = 90.0f;
 
 static float camera_pitch = 0.0f;
 static float camera_yaw   = 0.0f;
-static vec3_t camera_pos  = { 0.0f, 0.0f, 0.0f };
+static vec3_t camera_pos  = { 0.0f, 0.0f, 10.0f };
 
 static bool free_look = false;
 static float look_sensitivity = 0.002f;
@@ -53,20 +54,52 @@ static bool input[INPUT_COUNT] = {0};
 static color_t foreground = { 1.0f, 1.0f, 1.0f, 1.0f };
 static color_t background = { 0.2f, 0.2f, 0.2f, 0.7f };
 
-static editor_t editor;
+
+static editor_t editor = {0};
+static l_system_t l_system = {0};
+
+static bool has_model = false;
+static unsigned texture_atlas;
+static model_object_t model_object;
+
+
+static void try_compile(void)
+{
+    has_model = false;
+
+    parse_state_t state = parse(&l_system, editor.text_buffer, editor.text_size);
+
+    if (!state.res.success) {
+        printf("%zd:%zd ", state.res.line, state.res.col);
+        sv_fwrite(state.res.message, stdout);
+        printf("\n");
+        return;
+    }
+
+    for (int i = 0; i < 8; ++i) {
+        char *error = l_system_update(&l_system);
+        if (error) {
+            printf("runtime error: %s\n", error);
+        }
+    }
+
+    l_build_t build = l_system_build(&l_system);
+
+    if (build.error) {
+        printf("build error: %s\n", build.error);
+        return;
+    }
+
+    texture_atlas = build.atlas;
+    model_object = build.object;
+    has_model = true;
+}
+
 
 
 static void render_gui(void)
 {
-    const char *text = "I like killing animals with my machetay.";
-
-    gui_begin_rect();
-    gui_draw_rect(0, 0, window_width, 24, background);
-
-    gui_begin_text();
-    gui_draw_text(text, 0, 4, 8, 16, 0, foreground);
-
-    // editor_render(&editor, 100, 100);
+    editor_render(&editor, 0, 0);
 }
 
 
@@ -101,183 +134,55 @@ int bagE_main(int argc, char *argv[])
 
 
     editor_init(&editor);
-    char text[] = "\n \\__/\n  \\/\n";
-    editor_replace(&editor, 0, 0, text, (int)strlen(text));
-
-
-    /* expo */
-#if 1
-    char parse_text[] =
-"1.3 + 2 * 3.0 - PI / 4";
-
-    tokenizer_t toki = {
-        .begin = parse_text,
-        .pos = parse_text,
-        .end = parse_text + length(parse_text) - 1,
-    };
-
-    l_system_t sys = {0};
-
-    parse_expr_res_t ret = parse_expression(&toki, &sys, NULL, NULL, 0);
-
-    if (ret.res.success) {
-        for (unsigned i = 0; i < ret.expr.count; ++i) {
-            fprint_instruction(sys.instructions[ret.expr.index + i], stdout);
-        }
-    } else {
-        printf("%zd:%zd: ", ret.res.line, ret.res.col);
-        sv_fwrite(ret.res.message, stdout);
-    }
-#endif
-
-
-    /* parso */
-#if 0
-    char parse_text[] =
-"res res_name=cilynder(...)\n"
-"res res_blame=model(\"\\\"bruh lol.obj\\\"\")\n"
+    char text[] =
+"#* Hi, this is a barely working proof of concept...\n"
+" *\n"
+" * You can click on this editor here to change the code.\n"
+" * If the code fails to compile an error message will be shown\n"
+" * in the stdout 'command prompt'.\n"
+" *\n"
+" * You can also click outside, then you can move around like in minecraft\n"
+" * creative mode, (w, a, s, d, shift, space and mouse).\n"
+" * Whilst in this mode you can press `c` to recompile the code.\n"
+" * Press 'esc' to gain back cursor. *#\n"
 "\n"
-"def type_name(n:int,s:float)={\n"
-"    res_name(rotate_x(s)),\n"
+"tex stone_tex(\"res/stone.png\")\n"
+"tex rat_tex(\"res/rat.png\")\n"
+"\n"
+"mod head_mod(\"res/head.obj\")\n"
+"\n"
+"res head = object(head_mod, stone_tex)\n"
+"res hair = sphere(3, rat_tex)\n"
+"\n"
+"def symbol_1(n: int) {\n"
+"    head(position(float(n), 0.0, 0.0))\n"
+"    hair(position(float(n), 2.5, -0.25))\n"
 "}\n"
 "\n"
-"# this is a comment\n"
+"# this is a rewriting rule, it matches\n"
+"# by the specified type `symbol_1` and an expression `true`\n"
+"# the expression can depend on the above defined parameters\n"
 "\n"
-"#* multiline\n"
-"   comment *# \n"
+"rule symbol_1(true) {\n"
+"    symbol_1(n)\n"
+"    symbol_1(n * 2)\n"
+"}\n"
 "\n"
-"rule type_name(n>=0)#* shit *#{\n"
-"    type_name(n-1,s+PI/4.0),#lol\n"
-"    type_name(n-1,s-PI/4.0)\n"
-"}\n";
+"# this way you insert starting symbols into the system\n"
+"# the system will iterate 8 times, (for now fixed number)\n"
+"\n"
+"symbol_1(1)\n"
+"\n"
+;
+    editor_replace(&editor, 0, 0, text, (int)strlen(text));
 
-    tokenizer_t toki = {
-        .begin = parse_text,
-        .pos = parse_text,
-        .end = parse_text + length(parse_text) - 1,
-    };
-
-    for (;;) {
-        token_t token = tokenizer_next(&toki, false);
-
-        printf("(%s, \"", token_type_to_str(token.type));
-        sv_fwrite(token.data, stdout);
-        printf(", %zd\")\n", token.ln);
-
-        if (token.type == token_type_Empty)
-            break;
-    }
-#endif
-
-
-    /* systo */
-#if 0
-    l_system_t sys = {0};
-
-    l_basic_t types[] = { l_basic_Float, l_basic_Int };
-    unsigned type = l_system_add_type(&sys, types, length(types));
-    printf("type: %d, param_type_count: %d, type_count: %d\n",
-           type, sys.param_type_count, sys.type_count);
-
-    l_instruction_t code[] = {
-        { .id = l_inst_Value, .op = { .type = l_basic_Int, .data.integer = 3 } },
-        { .id = l_inst_Value, .op = { .type = l_basic_Int, .data.integer = 2 } },
-        { .id = l_inst_Add },
-    };
-    l_expr_t expr = l_system_add_code(&sys, code, length(code));
-    printf("expr.index: %d, expr.count: %d, instruction_count: %d\n",
-           expr.index, expr.count, sys.instruction_count);
-
-    l_value_t val = l_evaluate(&sys, expr, type, 0, true);
-    printf("val.type: %s, val.data.integer: %d, val.data.floating: %f\n",
-           l_basic_name(val.type), val.data.integer, val.data.floating);
-
-    l_value_t params[] = {
-        { .type = l_basic_Float, .data.floating = 1.4f },
-        { .type = l_basic_Int,   .data.integer  = 3 },
-    };
-    l_system_append(&sys, type, params);
-    l_system_print(&sys);
-
-    l_instruction_t predicate[] = {
-        { .id = l_inst_Value, .op = { .type = l_basic_Bool, .data.boolean = true } },
-    };
-    l_match_t left = {
-        .type = type,
-        .predicate = l_system_add_code(&sys, predicate, length(predicate)),
-    };
-    unsigned param_types[] = { type, type };
-    l_instruction_t init_float[] = {
-        { .id = l_inst_Value, .op = { .type = l_basic_Float, .data.floating = 0.5 } },
-        { .id = l_inst_Param, .op = { .type = l_basic_Int,   .data.integer  = 0 } },
-        { .id = l_inst_Add },
-    };
-    l_instruction_t init_int[] = {
-        { .id = l_inst_Param, .op = { .type = l_basic_Int, .data.integer = 1 } },
-        { .id = l_inst_Value, .op = { .type = l_basic_Int, .data.integer = 1 } },
-        { .id = l_inst_Sub },
-    };
-    l_expr_t initializer[] = {
-        /* 0 */
-        l_system_add_code(&sys, init_float, length(init_float)),
-        l_system_add_code(&sys, init_int, length(init_int)),
-        /* 1 */
-        l_system_add_code(&sys, init_float, length(init_float)),
-        l_system_add_code(&sys, init_int, length(init_int)),
-    };
-    l_system_add_rule(&sys, left, param_types, initializer, length(param_types));
-    printf("rule_count: %d, result_count: %d, param_count: %d\n",
-           sys.rule_count, sys.result_count, sys.param_count);
-
-    l_system_update(&sys);
-    l_system_update(&sys);
-    l_system_print(&sys);
-#endif
+    try_compile();
 
     /* crap goes here */
     unsigned texture_program = load_program(
             "shaders/texture.vert.glsl",
             "shaders/texture.frag.glsl"
     );
-
-    texture_data_t textures[] = {
-        load_texture_data("res/stone.png"),
-        load_texture_data("res/rat.png"),
-    };
-
-    rect_t views[length(textures)];
-
-    texture_data_t atlas_data = create_texture_atlas(textures, views, length(textures));
-    unsigned atlas_texture = create_texture_object(atlas_data);
-
-    model_data_t cylinder = generate_cylinder(8, frect_make(views[1],
-                                                            atlas_data.width,
-                                                            atlas_data.height));
-
-    model_data_t sphere = generate_quad_sphere(0, frect_make(views[1],
-                                                             atlas_data.width,
-                                                             atlas_data.height));
-
-    model_data_t head_model = load_model_data("res/head.model");
-    model_map_textures_to_view(&head_model, frect_make(views[0],
-                                                       atlas_data.width,
-                                                       atlas_data.height));
-
-    model_builder_t builder = {0};
-
-    model_builder_merge(&builder, cylinder,
-                        matrix_translation( 0.0f, 0.0f, 0.0f));
-
-    model_builder_merge(&builder, sphere,
-                        matrix_translation( 0.0f, 2.0f, 0.0f));
-
-    model_builder_merge(&builder, head_model,
-                        matrix_translation( 1.0f, 0.0f, 0.0f));
-
-    model_builder_merge(&builder, head_model,
-                        matrix_translation(-1.0f, 0.5f, 0.0f));
-
-    model_object_t main_object = create_model_object(builder.data);
 
     unsigned cam_ubo = create_buffer_object(
         sizeof(matrix_t) * 3 + sizeof(float) * 4,
@@ -394,19 +299,22 @@ int bagE_main(int argc, char *argv[])
 
         glNamedBufferSubData(cam_ubo, 0, sizeof(cam_data), &cam_data);
 
-        matrix_t model = matrix_multiply(matrix_translation(0.0f,-0.5f,-4.0f),
-                                         matrix_rotation_y(model_rot));
+        // matrix_t model = matrix_multiply(matrix_translation(0.0f,-0.5f,-4.0f),
+                                         // matrix_rotation_y(model_rot));
+
+        matrix_t model = matrix_identity();
 
         model_rot += dt;
 
-        glUseProgram(texture_program);
-        glBindVertexArray(main_object.vao);
-        glBindTextureUnit(0, atlas_texture);
+        if (has_model) {
+            glUseProgram(texture_program);
+            glBindVertexArray(model_object.vao);
+            glBindTextureUnit(0, texture_atlas);
 
-        glProgramUniformMatrix4fv(texture_program, 0, 1, false, model.data);
+            glProgramUniformMatrix4fv(texture_program, 0, 1, false, model.data);
 
-        glDrawElements(GL_TRIANGLES, main_object.index_count, GL_UNSIGNED_INT, NULL);
-
+            glDrawElements(GL_TRIANGLES, model_object.index_count, GL_UNSIGNED_INT, NULL);
+        }
 
         /* overlay */
         glDisable(GL_DEPTH_TEST);
@@ -466,12 +374,10 @@ int bagE_eventHandler(bagE_Event *event)
             down = true;
             /* fallthrough */
         case bagE_EventMouseButtonUp: {
-            /*
             bagE_MouseButton mb = event->data.mouseButton;
 
-            if (editor_handle_mouse_button(&editor, 100, 100, mb, down))
+            if (!free_look && editor_handle_mouse_button(&editor, 0, 0, mb, down))
                 break;
-            */
 
             if (!down && !free_look) {
                 free_look = !free_look;
@@ -504,6 +410,12 @@ int bagE_eventHandler(bagE_Event *event)
                     }
                 } break;
 
+                case KEY_C: {
+                    if (!down && free_look) {
+                        try_compile();
+                    }
+                } break;
+
                 case KEY_SPACE:      { input[input_Up]    = down; } break;
                 case KEY_SHIFT_LEFT: { input[input_Down]  = down; } break;
                 case KEY_W:          { input[input_Forth] = down; } break;
@@ -512,7 +424,7 @@ int bagE_eventHandler(bagE_Event *event)
                 case KEY_D:          { input[input_Right] = down; } break;
             }
 
-            // editor_handle_key(&editor, *key, down);
+            editor_handle_key(&editor, *key, down);
         } break;
 
         case bagE_EventMouseMotion: {
@@ -525,12 +437,16 @@ int bagE_eventHandler(bagE_Event *event)
         } break;
 
         case bagE_EventTextUTF8: {
-            // editor_handle_utf8(&editor, event->data.textUTF8);
+            if (!free_look) {
+                editor_handle_utf8(&editor, event->data.textUTF8);
+            }
         } break;
 
         case bagE_EventMousePosition: {
-            // bagE_Mouse m = event->data.mouse;
-            // editor_handle_mouse_position(&editor, 100, 100, m);
+            bagE_Mouse m = event->data.mouse;
+            if (!free_look) {
+                editor_handle_mouse_position(&editor, 0, 0, m);
+            }
         } break;
 
         default: break;

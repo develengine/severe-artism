@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "linalg.h"
 #include "res.h"
+#include "core.h"
 
 
 typedef enum
@@ -284,5 +285,15 @@ l_eval_res_t l_evaluate(l_system_t *sys,
 
 char *l_system_update(l_system_t *sys);
 void l_system_print(l_system_t *sys);
+
+
+typedef struct
+{
+    unsigned atlas;
+    model_object_t object;
+    char *error;
+} l_build_t;
+
+l_build_t l_system_build(l_system_t *sys);
 
 #endif // L_SYSTEM

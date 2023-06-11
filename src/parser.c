@@ -788,7 +788,10 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
 
                 tokenizer_store(toki, token);
 
-                return (expr_rec_t) { .res = { .success = true } };
+                assert(temp_size == 1);
+
+                return (expr_rec_t) { .res = { .success = true },
+                                      .type = temp_stack[0].type, };
             }
 
             if (token.type != token_type_Operator) {
@@ -1096,7 +1099,7 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
 
     unsigned second_arg = 0;
     for (; second_arg < state->tex_count; ++second_arg) {
-        if (sv_eq(tex_name, state->mod_names[second_arg]))
+        if (sv_eq(tex_name, state->tex_names[second_arg]))
             break;
     }
 
@@ -1107,7 +1110,7 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
     if ((token = tokenizer_next(toki, true)).type == token_type_Error)
         return token_to_result(toki, token);
 
-    if (token.type != token_type_Separator || token.meta.sep != ',')
+    if (token.type != token_type_Separator || token.meta.sep != ')')
         return err(toki, token, "Expected ')', closing parenthesis!");
 
 
@@ -1537,6 +1540,8 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
 
 
             l_system_append(sys, type_index, temp_vals);
+
+            continue;
         }
 
         return err(toki, token, "Expected a block keyword or type identifier!");
@@ -1546,6 +1551,33 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
 
 parse_state_t parse(l_system_t *sys, char *text, size_t text_size)
 {
+    l_system_empty(sys);
+
+    sys->instruction_count = 0;
+    sys->type_load_count = 0;
+    sys->param_type_count = 0;
+    sys->type_count = 0;
+    sys->param_count = 0;
+    sys->result_count = 0;
+    sys->rule_count = 0;
+    sys->eval_stack_size = 0;
+
+    for (unsigned i = 0; i < sys->texture_count; ++i) {
+        free_texture_data(sys->textures[i]);
+    }
+    sys->texture_count = 0;
+
+    for (unsigned i = 0; i < sys->model_count; ++i) {
+        free_model_data(sys->models[i]);
+    }
+    sys->model_count = 0;
+
+    for (unsigned i = 0; i < sys->resource_count; ++i) {
+        free_model_data(sys->resources[i].model);
+    }
+    sys->resource_count = 0;
+
+
     parse_state_t state = {0};
 
     tokenizer_t toki = {
