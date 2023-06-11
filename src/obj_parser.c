@@ -70,6 +70,9 @@ static bool index_eq(const index_t *i1, const index_t *i2)
 model_data_t load_obj_file(const char *path)
 {
     char *text = read_file(path);
+    if (!text)
+        return (model_data_t) {0};
+
     obj_info_t info = load_info(text);
 
     float *positions = malloc(
@@ -112,12 +115,14 @@ model_data_t load_obj_file(const char *path)
                 at = end;
                 positions[pos_offset++] = strtof(at, &end);
                 at = end;
-            } else if (at[2] == 't') {
+            }
+            else if (at[2] == 't') {
                 textures[tex_offset++] = strtof(at + 4, &end);
                 at = end;
                 textures[tex_offset++] = strtof(at, &end);
                 at = end;
-            } else if (at[2] == 'n') {
+            }
+            else if (at[2] == 'n') {
                 normals[norm_offset++] = strtof(at + 4, &end);
                 at = end;
                 normals[norm_offset++] = strtof(at, &end);
@@ -125,7 +130,8 @@ model_data_t load_obj_file(const char *path)
                 normals[norm_offset++] = strtof(at, &end);
                 at = end;
             }
-        } else if (at[1] == 'f') {
+        }
+        else if (at[1] == 'f') {
             index_t inds[3];
             int ic = 0;
 
@@ -147,7 +153,6 @@ model_data_t load_obj_file(const char *path)
                     for (int i = 0; i < 3; ++i) {
                         bool found = false;
 
-                        // TODO: heap search
                         for (int j = 0; j < vertex_count; ++j) {
                             if (index_eq(inds + i, indices + j)) {
                                 index_data[index_count++] = indices[j].index;
@@ -186,7 +191,8 @@ model_data_t load_obj_file(const char *path)
                     }
                 }
             }
-        } else {
+        }
+        else {
             at = strchr(at + 1, '\n');
         }
     }

@@ -2,6 +2,7 @@
 #define RES_H
 
 #include "linalg.h"
+#include "utils.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -27,6 +28,25 @@ static inline void free_model_data(model_data_t model_data)
 {
     free(model_data.vertices);
     free(model_data.indices);
+}
+
+static model_data_t copy_model_data(model_data_t model_data)
+{
+    vertex_t *new_vertices = malloc(model_data.vertex_count * sizeof(vertex_t));
+    malloc_check(new_vertices);
+
+    unsigned *new_indices = malloc(model_data.index_count * sizeof(unsigned));
+    malloc_check(new_indices);
+
+    memcpy(new_vertices, model_data.vertices, model_data.vertex_count * sizeof(vertex_t));
+    memcpy(new_indices,  model_data.indices,  model_data.index_count  * sizeof(unsigned));
+
+    return (model_data_t) {
+        .vertex_count = model_data.vertex_count,
+        .index_count  = model_data.index_count,
+        .vertices = new_vertices,
+        .indices  = new_indices,
+    };
 }
 
 

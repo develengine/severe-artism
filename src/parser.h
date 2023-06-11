@@ -23,9 +23,15 @@ typedef enum
 
 typedef enum
 {
+    token_kw_Tex,
+    token_kw_Mod,
     token_kw_Res,
     token_kw_Def,
     token_kw_Rule,
+
+    token_kw_Cylinder,
+    token_kw_Sphere,
+    token_kw_Object,
 
     token_kw_Int,
     token_kw_Float,
@@ -115,10 +121,33 @@ const char *token_type_to_str(token_type_t type);
 typedef struct
 {
     parse_result_t res;
+    l_basic_t type;
     l_expr_t expr;
 } parse_expr_res_t;
 
+typedef struct
+{
+    parse_result_t res;
+
+    sv_t *tex_names;
+    unsigned tex_count, tex_capacity;
+
+    sv_t *mod_names;
+    unsigned mod_count, mod_capacity;
+
+    sv_t *res_names;
+    unsigned res_count, res_capacity;
+
+    sv_t *def_names;
+    unsigned def_count, def_capacity;
+
+    sv_t *param_names;
+    unsigned param_count, param_capacity;
+} parse_state_t;
+
 parse_expr_res_t parse_expression(tokenizer_t *toki, l_system_t *sys,
-                                  bool has_params, unsigned type);
+                                  sv_t *param_names, l_basic_t *param_types, unsigned param_count);
+
+parse_state_t parse(l_system_t *sys, char *text, size_t text_size);
 
 #endif // PARSER_H

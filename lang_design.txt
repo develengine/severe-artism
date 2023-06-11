@@ -20,18 +20,22 @@ tex tex1("")
 
 mod model1("djwadjiwa")
 
-res res_name = cylinder(...)
+res res_name = cylinder(3, tex1)
+               sphere(2, tex1)
+               object(model1, tex1)
 
-def type_name(n: int, s: float) = {
-    res_name(rotate_x(s)),
+
+def type_name(n: int, s: float) {
+    res_name(rotate_x(s))
 }
 
+
 rule type_name(n > 0) {
-    type_name(n - 1, s + PI / 4),
+    type_name(n - 1, s + PI / 4)
     type_name(n - 1, s - PI / 4)
 }
 
 
-
+type_name(3, 5)
 
 

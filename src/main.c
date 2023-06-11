@@ -118,7 +118,7 @@ int bagE_main(int argc, char *argv[])
 
     l_system_t sys = {0};
 
-    parse_expr_res_t ret = parse_expression(&toki, &sys, false, 0);
+    parse_expr_res_t ret = parse_expression(&toki, &sys, NULL, NULL, 0);
 
     if (ret.res.success) {
         for (unsigned i = 0; i < ret.expr.count; ++i) {
@@ -254,7 +254,7 @@ int bagE_main(int argc, char *argv[])
                                                             atlas_data.width,
                                                             atlas_data.height));
 
-    model_data_t sphere = generate_quad_sphere(2, frect_make(views[1],
+    model_data_t sphere = generate_quad_sphere(0, frect_make(views[1],
                                                              atlas_data.width,
                                                              atlas_data.height));
 

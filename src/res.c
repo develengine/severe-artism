@@ -16,7 +16,7 @@ uint8_t *load_image(const char *path, int *width, int *height, int *channels, bo
     uint8_t *image = stbi_load(path, width, height, channels, STBI_rgb_alpha);
     if (!image) {
         fprintf(stderr, "Failed to load image \"%s\"\n", path);
-        exit(1);
+        // FIXME: For now we just print an error.
     }
 
     return image;

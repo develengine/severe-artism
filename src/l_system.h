@@ -3,6 +3,7 @@
 
 #include "utils.h"
 #include "linalg.h"
+#include "res.h"
 
 
 typedef enum
@@ -144,7 +145,19 @@ static inline void fprint_instruction(l_instruction_t inst, FILE *file)
 
 typedef struct
 {
+    unsigned index, count;
+} l_expr_t;
+
+typedef struct
+{
+    unsigned resource_index;
+    l_expr_t expr;
+} l_type_load_t;
+
+typedef struct
+{
     unsigned params_index, params_count;
+    unsigned load_index, load_count;
 } l_type_t;
 
 typedef struct
@@ -152,11 +165,6 @@ typedef struct
     unsigned type;
     unsigned data_index;
 } l_symbol_t;
-
-typedef struct
-{
-    unsigned index, count;
-} l_expr_t;
 
 typedef struct
 {
@@ -180,6 +188,12 @@ typedef struct
 
 typedef struct
 {
+    model_data_t model;
+    unsigned texture_index;
+} l_resource_t;
+
+typedef struct
+{
     l_value_t *data_buffers[2];
     unsigned data_lengths[2];
     unsigned data_capacities[2];
@@ -190,16 +204,19 @@ typedef struct
 
     unsigned id;
 
+    /* code */
+    l_instruction_t *instructions;
+    unsigned instruction_count, instruction_capacity;
+
     /* types */
+    l_type_load_t *type_loads;
+    unsigned type_load_count, type_load_capacity;
+
     l_basic_t *param_types;
     unsigned param_type_count, param_type_capacity;
 
     l_type_t *types;
     unsigned type_count, type_capacity;
-
-    /* code */
-    l_instruction_t *instructions;
-    unsigned instruction_count, instruction_capacity;
 
     /* rules */
     l_expr_t *params;
@@ -217,10 +234,26 @@ typedef struct
     /* evaluation stack */
     l_value_t *eval_stack;
     unsigned eval_stack_size, eval_stack_capacity;
+
+    /* textures */
+    texture_data_t *textures;
+    unsigned texture_count, texture_capacity;
+
+    /* models */
+    model_data_t *models;
+    unsigned model_count, model_capacity;
+
+    /* rescources */
+    l_resource_t *resources;
+    unsigned resource_count, resource_capacity;
 } l_system_t;
 
-unsigned l_system_add_type(l_system_t *sys, l_basic_t *types, int count);
+unsigned l_system_add_type(l_system_t *sys,
+                           l_basic_t     *types, unsigned type_count,
+                           l_type_load_t *loads, unsigned load_count);
+
 l_expr_t l_system_add_code(l_system_t *sys, l_instruction_t *instructions, int count);
+
 void l_system_add_rule(l_system_t *sys,
                        l_match_t left,
                        unsigned *right_types,
@@ -242,13 +275,14 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
                                     l_value_t *data_top, unsigned data_size,
                                     bool compute);
 
-l_value_t l_evaluate(l_system_t *sys,
-                     l_expr_t expr,
-                     unsigned type_index,
-                     unsigned data_index,
-                     bool compute);
+l_eval_res_t l_evaluate(l_system_t *sys,
+                        l_expr_t expr,
+                        bool has_params,
+                        unsigned type_index,
+                        unsigned data_index,
+                        bool compute);
 
-void l_system_update(l_system_t *sys);
+char *l_system_update(l_system_t *sys);
 void l_system_print(l_system_t *sys);
 
 #endif // L_SYSTEM
