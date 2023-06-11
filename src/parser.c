@@ -109,7 +109,7 @@ static int kw_arg_counts[] = {
 
     [token_kw_Int] = 1,
     [token_kw_Float] = 1,
-    [token_kw_Bool] = -1,
+    [token_kw_Bool] = 1,
     [token_kw_Mat] = -1,
 
     [token_kw_Rotation] = 3,
@@ -128,7 +128,7 @@ static l_instruction_t kw_instructions[] = {
 
     [token_kw_Int] = { .id = l_inst_CastInt },
     [token_kw_Float] = { .id = l_inst_CastFloat },
-    [token_kw_Bool] = {0},
+    [token_kw_Bool] = { .id = l_inst_CastBool },
     [token_kw_Mat] = {0},
 
     [token_kw_Rotation] = { .id = l_inst_Rotation },

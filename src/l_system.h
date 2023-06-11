@@ -71,6 +71,7 @@ typedef enum
 
     l_inst_CastInt,
     l_inst_CastFloat,
+    l_inst_CastBool,
 
     l_inst_Rotation,
     l_inst_Scale,
@@ -113,27 +114,28 @@ static inline void fprint_instruction(l_instruction_t inst, FILE *file)
             fprintf(file, "param { %d }\n", inst.op.data.integer);
         } break;
 
-        case l_inst_Add: { fprintf(file, "add {}\n"); } break;
-        case l_inst_Sub: { fprintf(file, "sub {}\n"); } break;
-        case l_inst_Mul: { fprintf(file, "mul {}\n"); } break;
-        case l_inst_Div: { fprintf(file, "div {}\n"); } break;
-        case l_inst_Mod: { fprintf(file, "mod {}\n"); } break;
-        case l_inst_Neg: { fprintf(file, "neg {}\n"); } break;
-        case l_inst_Less: { fprintf(file, "less {}\n"); } break;
-        case l_inst_More: { fprintf(file, "more {}\n"); } break;
-        case l_inst_LessEq: { fprintf(file, "less eq {}\n"); } break;
-        case l_inst_MoreEq: { fprintf(file, "more eq {}\n"); } break;
-        case l_inst_Equal: { fprintf(file, "equal {}\n"); } break;
-        case l_inst_NotEqual: { fprintf(file, "not equal {}\n"); } break;
-        case l_inst_And: { fprintf(file, "and {}\n"); } break;
-        case l_inst_Or: { fprintf(file, "or {}\n"); } break;
-        case l_inst_Not: { fprintf(file, "not {}\n"); } break;
-        case l_inst_CastInt: { fprintf(file, "cast int {}\n"); } break;
-        case l_inst_CastFloat: { fprintf(file, "cast float {}\n"); } break;
-        case l_inst_Rotation: { fprintf(file, "rotation {}\n"); } break;
-        case l_inst_Scale: { fprintf(file, "scale {}\n"); } break;
-        case l_inst_Position: { fprintf(file, "position {}\n"); } break;
-        case l_inst_Noop: { fprintf(file, "noop {}\n"); } break;
+        case l_inst_Add: { fprintf(file, "add\n"); } break;
+        case l_inst_Sub: { fprintf(file, "sub\n"); } break;
+        case l_inst_Mul: { fprintf(file, "mul\n"); } break;
+        case l_inst_Div: { fprintf(file, "div\n"); } break;
+        case l_inst_Mod: { fprintf(file, "mod\n"); } break;
+        case l_inst_Neg: { fprintf(file, "neg\n"); } break;
+        case l_inst_Less: { fprintf(file, "less\n"); } break;
+        case l_inst_More: { fprintf(file, "more\n"); } break;
+        case l_inst_LessEq: { fprintf(file, "less eq\n"); } break;
+        case l_inst_MoreEq: { fprintf(file, "more eq\n"); } break;
+        case l_inst_Equal: { fprintf(file, "equal\n"); } break;
+        case l_inst_NotEqual: { fprintf(file, "not equal\n"); } break;
+        case l_inst_And: { fprintf(file, "and\n"); } break;
+        case l_inst_Or: { fprintf(file, "or\n"); } break;
+        case l_inst_Not: { fprintf(file, "not\n"); } break;
+        case l_inst_CastInt: { fprintf(file, "cast int\n"); } break;
+        case l_inst_CastFloat: { fprintf(file, "cast float\n"); } break;
+        case l_inst_CastBool: { fprintf(file, "cast bool\n"); } break;
+        case l_inst_Rotation: { fprintf(file, "rotation\n"); } break;
+        case l_inst_Scale: { fprintf(file, "scale\n"); } break;
+        case l_inst_Position: { fprintf(file, "position\n"); } break;
+        case l_inst_Noop: { fprintf(file, "noop\n"); } break;
 
         default:
             assert(0 && "unknown value");

@@ -309,15 +309,17 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
 
             if (compute) {
                 if (has_float) {
+                    float fa = a.data.floating;
+                    float fb = b.data.floating;
+
                     if (a.type == l_basic_Int) {
-                        res.data.floating = (float)(a.data.integer) + b.data.floating;
+                        fa = (float)(a.data.integer);
                     }
                     else if (b.type == l_basic_Int) {
-                        res.data.floating = a.data.floating + (float)(b.data.integer);
+                        fb = (float)(b.data.integer);
                     }
-                    else {
-                        res.data.floating = a.data.floating + b.data.floating;
-                    }
+
+                    res.data.floating = fa + fb;
                 }
                 else {
                     res.data.integer = a.data.integer + b.data.integer;
@@ -347,15 +349,17 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
 
             if (compute) {
                 if (has_float) {
+                    float fa = a.data.floating;
+                    float fb = b.data.floating;
+
                     if (a.type == l_basic_Int) {
-                        res.data.floating = (float)(a.data.integer) - b.data.floating;
+                        fa = (float)(a.data.integer);
                     }
                     else if (b.type == l_basic_Int) {
-                        res.data.floating = a.data.floating - (float)(b.data.integer);
+                        fb = (float)(b.data.integer);
                     }
-                    else {
-                        res.data.floating = a.data.floating - b.data.floating;
-                    }
+
+                    res.data.floating = fa - fb;
                 }
                 else {
                     res.data.integer = a.data.integer - b.data.integer;
@@ -365,12 +369,277 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
             return (l_eval_res_t) { res, 2 };
         } break;
 
+        case l_inst_Mul: {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            if (a.type == l_basic_Bool || b.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Product of booleans is not allowed!" };
+
+            if (a.type == l_basic_Mat4 || b.type == l_basic_Mat4) {
+                if (a.type != l_basic_Mat4 || b.type != l_basic_Mat4)
+                    return (l_eval_res_t) { .error = "Both values must be matrices for product!" };
+
+                l_value_t res = { .type = l_basic_Mat4 };
+
+                if (compute) {
+                    res.data.matrix = matrix_multiply(a.data.matrix, b.data.matrix);
+                }
+
+                return (l_eval_res_t) { res, 2 };
+            }
+
+            bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
+
+            l_value_t res = {
+                .type = has_float ? l_basic_Float : l_basic_Int,
+            };
+
+            if (compute) {
+                if (has_float) {
+                    float fa = a.data.floating;
+                    float fb = b.data.floating;
+
+                    if (a.type == l_basic_Int) {
+                        fa = (float)(a.data.integer);
+                    }
+                    else if (b.type == l_basic_Int) {
+                        fb = (float)(b.data.integer);
+                    }
+
+                    res.data.floating = fa * fb;
+                }
+                else {
+                    res.data.integer = a.data.integer * b.data.integer;
+                }
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_Div: {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            if (a.type == l_basic_Bool || b.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Division of booleans is not allowed!" };
+
+            if (a.type == l_basic_Mat4 || b.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Division of matrices is not allowed!" };
+
+            bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
+
+            l_value_t res = {
+                .type = has_float ? l_basic_Float : l_basic_Int,
+            };
+
+            if (compute) {
+                if (has_float) {
+                    float fa = a.data.floating;
+                    float fb = b.data.floating;
+
+                    if (a.type == l_basic_Int) {
+                        fa = (float)(a.data.integer);
+                    }
+                    else if (b.type == l_basic_Int) {
+                        fb = (float)(b.data.integer);
+                    }
+
+                    res.data.floating = fa / fb;
+                }
+                else {
+                    if (b.data.integer == 0)
+                        return (l_eval_res_t) { .error = "Division by zero!" };
+
+                    res.data.integer = a.data.integer / b.data.integer;
+                }
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_Mod: {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            if (a.type == l_basic_Bool || b.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Modulo of booleans is not allowed!" };
+
+            if (a.type == l_basic_Float || b.type == l_basic_Float)
+                return (l_eval_res_t) { .error = "Modulo of floats is not allowed!" };
+
+            if (a.type == l_basic_Mat4 || b.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Modulo of matrices is not allowed!" };
+
+            l_value_t res = { .type = l_basic_Int };
+
+            if (compute) {
+                res.data.integer = a.data.integer % b.data.integer;
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_Neg: {
+            assert(data_size >= 1);
+
+            l_value_t a = data_top[0];
+
+            if (a.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Minus before boolean is not allowed!" };
+
+            if (a.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Minus before matrix is not allowed!" };
+
+            l_value_t res = { .type = a.type };
+
+            if (compute) {
+                if (a.type == l_basic_Float) {
+                    res.data.floating = -a.data.floating;
+                }
+                else {
+                    res.data.integer = -a.data.integer;
+                }
+            }
+
+            return (l_eval_res_t) { res, 1 };
+        } break;
+
+        case l_inst_Less:   /* fallthrough */
+        case l_inst_More:   /* fallthrough */
+        case l_inst_LessEq: /* fallthrough */
+        case l_inst_MoreEq: /* fallthrough */
+        case l_inst_Equal:  /* fallthrough */
+        case l_inst_NotEqual:
+        {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            if (a.type == l_basic_Bool || b.type == l_basic_Bool)
+                return (l_eval_res_t) { .error = "Comparison of booleans is not allowed!" };
+
+            if (a.type == l_basic_Mat4 || b.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Comparison of matrices is not allowed!" };
+
+            bool has_float = a.type == l_basic_Float || b.type == l_basic_Float;
+
+            l_value_t res = { .type = l_basic_Bool };
+
+            if (compute) {
+                if (has_float) {
+                    float fa = a.data.floating;
+                    float fb = b.data.floating;
+
+                    if (a.type == l_basic_Int) {
+                        fa = (float)(a.data.integer);
+                    }
+                    else if (b.type == l_basic_Int) {
+                        fb = (float)(b.data.integer);
+                    }
+
+                    if      (inst.id == l_inst_Less)   res.data.boolean = fa <  fb;
+                    else if (inst.id == l_inst_More)   res.data.boolean = fa >  fb;
+                    else if (inst.id == l_inst_LessEq) res.data.boolean = fa <= fb;
+                    else if (inst.id == l_inst_MoreEq) res.data.boolean = fa >= fb;
+                    else if (inst.id == l_inst_Equal)  res.data.boolean = fa == fb;
+                    else                               res.data.boolean = fa != fb;
+                }
+                else {
+                    int ia = a.data.integer;
+                    int ib = b.data.integer;
+
+                    if      (inst.id == l_inst_Less)   res.data.boolean = ia <  ib;
+                    else if (inst.id == l_inst_More)   res.data.boolean = ia >  ib;
+                    else if (inst.id == l_inst_LessEq) res.data.boolean = ia <= ib;
+                    else if (inst.id == l_inst_MoreEq) res.data.boolean = ia >= ib;
+                    else if (inst.id == l_inst_Equal)  res.data.boolean = ia == ib;
+                    else                               res.data.boolean = ia != ib;
+                }
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_And: /* fallthrough */
+        case l_inst_Or:  /* fallthrough */
+        case l_inst_Not:
+        {
+            assert(data_size >= 2);
+
+            l_value_t a = data_top[-1];
+            l_value_t b = data_top[ 0];
+
+            l_value_t res = { .type = l_basic_Bool };
+
+            if (a.type != l_basic_Bool || b.type != l_basic_Bool)
+                return (l_eval_res_t) { .error = "Logical operators take only booleans!" };
+
+            if (compute) {
+                bool ba = a.data.boolean;
+                bool bb = b.data.boolean;
+
+                if      (inst.id == l_inst_And) res.data.boolean = ba <  bb;
+                else if (inst.id == l_inst_Or)  res.data.boolean = ba >  bb;
+                else                            res.data.boolean = ba != bb;
+            }
+
+            return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_CastInt:   /* fallthrough */
+        case l_inst_CastFloat: /* fallthrough */
+        case l_inst_CastBool:
+        {
+            assert(data_size >= 1);
+
+            l_value_t a = data_top[0];
+
+            if (a.type == l_basic_Mat4)
+                return (l_eval_res_t) { .error = "Can't cast matrix to another type!" };
+
+            l_value_t res = { .type = a.type };
+
+            if (compute) {
+                if (inst.id == l_inst_CastInt) {
+                    if      (a.type == l_basic_Float) res.data.integer = (int)a.data.floating;
+                    else if (a.type == l_basic_Bool)  res.data.integer = (int)a.data.boolean;
+                    else                              res.data.integer = a.data.integer;
+                }
+                else if (inst.id == l_inst_CastFloat) {
+                    if      (a.type == l_basic_Int)  res.data.floating = (float)a.data.integer;
+                    else if (a.type == l_basic_Bool) res.data.floating = (float)a.data.boolean;
+                    else                             res.data.floating = a.data.floating;
+                }
+                else {
+                    if      (a.type == l_basic_Int)   res.data.boolean = (bool)a.data.integer;
+                    else if (a.type == l_basic_Float) res.data.boolean = (bool)a.data.floating;
+                    else                              res.data.boolean = a.data.boolean;
+                }
+            }
+
+            return (l_eval_res_t) { res, 1 };
+        } break;
+
+        case l_inst_Noop: {
+            assert(data_size >= 1);
+
+            l_value_t a = data_top[0];
+
+            return (l_eval_res_t) { a, 1 };
+        } break;
+
         default: {
             return (l_eval_res_t) { .error = "Unimplemented instruction!" };
         }
     }
-
-    unreachable();
 }
 
 

@@ -16,9 +16,11 @@ Options:
 - Fullscreen
 
 
+tex tex1("")
 
+mod model1("djwadjiwa")
 
-res res_name = cilynder(...)
+res res_name = cylinder(...)
 
 def type_name(n: int, s: float) = {
     res_name(rotate_x(s)),

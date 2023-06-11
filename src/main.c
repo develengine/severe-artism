@@ -108,7 +108,7 @@ int bagE_main(int argc, char *argv[])
     /* expo */
 #if 1
     char parse_text[] =
-"1 + 2 - 3";
+"1.3 + 2 * 3.0 - PI / 4";
 
     tokenizer_t toki = {
         .begin = parse_text,
