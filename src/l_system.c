@@ -735,7 +735,6 @@ l_eval_res_t l_evaluate(l_system_t *sys,
                                                   sys->eval_stack + sys->eval_stack_size - 1,
                                                   sys->eval_stack_size,
                                                   compute);
-
         if (res.error)
             return res;
 
@@ -755,22 +754,6 @@ l_eval_res_t l_evaluate(l_system_t *sys,
 
 l_build_t l_system_build(l_system_t *sys)
 {
-    if (sys->texture_count == 0)
-        return (l_build_t) { .error = "No textures loaded!" };
-
-    rect_t *views = malloc(sys->texture_count * sizeof(rect_t));;
-
-    texture_data_t atlas_data = create_texture_atlas(sys->textures, views, sys->texture_count);
-    unsigned atlas_texture = create_texture_object(atlas_data);
-
-    for (unsigned i = 0; i < sys->resource_count; ++i) {
-        l_resource_t *res = sys->resources + i;
-        model_map_textures_to_view(&(res->model),
-                                   frect_make(views[res->texture_index],
-                                              atlas_data.width, atlas_data.height));
-    }
-
-
     model_builder_t builder = {0};
 
     for (unsigned i = 0; i < sys->lengths[sys->id]; ++i) {
@@ -801,7 +784,7 @@ l_build_t l_system_build(l_system_t *sys)
     free_model_data(builder.data);
 
     return (l_build_t) {
-        .atlas = atlas_texture,
         .object = object,
     };
 }
+

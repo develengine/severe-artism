@@ -1549,18 +1549,26 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
 }
 
 
-parse_state_t parse(l_system_t *sys, char *text, size_t text_size)
+void parse(l_system_t *sys, parse_state_t *state, char *text, size_t text_size)
 {
+    /* empty everything */
     l_system_empty(sys);
 
     sys->instruction_count = 0;
-    sys->type_load_count = 0;
-    sys->param_type_count = 0;
-    sys->type_count = 0;
-    sys->param_count = 0;
-    sys->result_count = 0;
-    sys->rule_count = 0;
-    sys->eval_stack_size = 0;
+    sys->type_load_count   = 0;
+    sys->param_type_count  = 0;
+    sys->type_count        = 0;
+    sys->param_count       = 0;
+    sys->result_count      = 0;
+    sys->rule_count        = 0;
+    sys->eval_stack_size   = 0;
+    sys->view_count        = 0;
+
+    state->tex_count       = 0;
+    state->mod_count       = 0;
+    state->res_count       = 0;
+    state->def_count       = 0;
+    state->param_count     = 0;
 
     for (unsigned i = 0; i < sys->texture_count; ++i) {
         free_texture_data(sys->textures[i]);
@@ -1577,16 +1585,40 @@ parse_state_t parse(l_system_t *sys, char *text, size_t text_size)
     }
     sys->resource_count = 0;
 
+    free_texture_data(sys->atlas);
 
-    parse_state_t state = {0};
+    glDeleteTextures(1, &sys->atlas_texture);
 
+
+    /* parse */
     tokenizer_t toki = {
         .begin = text,
         .pos = text,
         .end = text + text_size,
     };
 
-    state.res = parse_document(&state, &toki, sys);
+    state->res = parse_document(state, &toki, sys);
 
-    return state;
+    if (!state->res.success)
+        return;
+
+    /* create texture atlas */
+    if (sys->texture_count == 0) {
+        state->res.success = false;
+        state->res.message = sv_l("No textures provided!");
+        return;
+    }
+
+    safe_reserve(sys->views, sys->view_count, sys->view_capacity, sys->texture_count);
+
+    sys->atlas = create_texture_atlas(sys->textures, sys->views, sys->texture_count);
+    sys->atlas_texture = create_texture_object(sys->atlas);
+
+    for (unsigned i = 0; i < sys->resource_count; ++i) {
+        l_resource_t *res = sys->resources + i;
+        model_map_textures_to_view(
+            &res->model,
+            frect_make(sys->views[res->texture_index], sys->atlas.width, sys->atlas.height)
+        );
+    }
 }

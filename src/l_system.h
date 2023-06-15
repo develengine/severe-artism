@@ -247,6 +247,14 @@ typedef struct
     /* rescources */
     l_resource_t *resources;
     unsigned resource_count, resource_capacity;
+
+    /* atlas stuff */
+    rect_t *views;
+    unsigned view_count, view_capacity;
+
+    texture_data_t atlas;
+
+    unsigned atlas_texture;
 } l_system_t;
 
 unsigned l_system_add_type(l_system_t *sys,
@@ -289,7 +297,6 @@ void l_system_print(l_system_t *sys);
 
 typedef struct
 {
-    unsigned atlas;
     model_object_t object;
     char *error;
 } l_build_t;

@@ -148,6 +148,6 @@ typedef struct
 parse_expr_res_t parse_expression(tokenizer_t *toki, l_system_t *sys,
                                   sv_t *param_names, l_basic_t *param_types, unsigned param_count);
 
-parse_state_t parse(l_system_t *sys, char *text, size_t text_size);
+void parse(l_system_t *sys, parse_state_t *state, char *text, size_t text_size);
 
 #endif // PARSER_H

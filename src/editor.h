@@ -2,7 +2,7 @@
 #define EDITOR_H
 
 /* TODO:
- * [ ] text selection, copying and pasting
+ * [X] text selection, copying and pasting
  * [ ] line numbers
  * [ ] syntax token highlighting
  * [ ] error message marking

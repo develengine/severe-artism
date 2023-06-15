@@ -1,3 +1,12 @@
+/* TODO:
+ * [ ] Properly compute normal matrices when merging in model builder.
+ * [ ] Add mouse scroll to the text editor.
+ * [ ] Add errors to editor.
+ * [ ] Add syntax highlighting to the text editor.
+ * [ ] Make the text editor retractable.
+ * [ ] Add way to export programs.
+ */
+
 #include "bag_engine.h"
 #include "bag_keys.h"
 #include "bag_time.h"
@@ -58,8 +67,9 @@ static color_t background = { 0.2f, 0.2f, 0.2f, 0.7f };
 static editor_t editor = {0};
 static l_system_t l_system = {0};
 
+static parse_state_t parse_state = {0};
+
 static bool has_model = false;
-static unsigned texture_atlas;
 static model_object_t model_object;
 
 
@@ -67,15 +77,16 @@ static void try_compile(void)
 {
     has_model = false;
 
-    parse_state_t state = parse(&l_system, editor.text_buffer, editor.text_size);
+    parse(&l_system, &parse_state, editor.text_buffer, editor.text_size);
 
-    if (!state.res.success) {
-        printf("%zd:%zd ", state.res.line, state.res.col);
-        sv_fwrite(state.res.message, stdout);
+    if (!parse_state.res.success) {
+        printf("%zd:%zd ", parse_state.res.line, parse_state.res.col);
+        sv_fwrite(parse_state.res.message, stdout);
         printf("\n");
         return;
     }
 
+    /* iterate the system */
     for (int i = 0; i < 8; ++i) {
         char *error = l_system_update(&l_system);
         if (error) {
@@ -90,7 +101,6 @@ static void try_compile(void)
         return;
     }
 
-    texture_atlas = build.atlas;
     model_object = build.object;
     has_model = true;
 }
@@ -299,9 +309,6 @@ int bagE_main(int argc, char *argv[])
 
         glNamedBufferSubData(cam_ubo, 0, sizeof(cam_data), &cam_data);
 
-        // matrix_t model = matrix_multiply(matrix_translation(0.0f,-0.5f,-4.0f),
-                                         // matrix_rotation_y(model_rot));
-
         matrix_t model = matrix_identity();
 
         model_rot += dt;
@@ -309,7 +316,7 @@ int bagE_main(int argc, char *argv[])
         if (has_model) {
             glUseProgram(texture_program);
             glBindVertexArray(model_object.vao);
-            glBindTextureUnit(0, texture_atlas);
+            glBindTextureUnit(0, l_system.atlas_texture);
 
             glProgramUniformMatrix4fv(texture_program, 0, 1, false, model.data);
 
