@@ -71,6 +71,7 @@ void model_builder_merge(model_builder_t *builder,
 {
     stretch(builder, data.vertex_count, data.index_count);
 
+    matrix_t norm_transform = matrix_transpose(matrix_invert(transform));
 
     int vertex_count = builder->data.vertex_count;
 
@@ -81,7 +82,7 @@ void model_builder_merge(model_builder_t *builder,
             vert.positions[0],
             vert.positions[1],
             vert.positions[2],
-            1.0f
+            1.0f,
         };
 
         p = vector_transform(p, transform);
@@ -89,6 +90,19 @@ void model_builder_merge(model_builder_t *builder,
         vert.positions[0] = p.x;
         vert.positions[1] = p.y;
         vert.positions[2] = p.z;
+
+        vector_t n = {
+            vert.normals[0],
+            vert.normals[1],
+            vert.normals[2],
+            0.0f,
+        };
+
+        n = vector_transform(n, norm_transform);
+
+        vert.normals[0] = n.x;
+        vert.normals[1] = n.y;
+        vert.normals[2] = n.z;
 
         builder->data.vertices[vertex_count + i] = vert;
     }
