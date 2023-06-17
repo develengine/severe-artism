@@ -71,7 +71,7 @@ void model_builder_merge(model_builder_t *builder,
 {
     stretch(builder, data.vertex_count, data.index_count);
 
-    matrix_t norm_transform = matrix_transpose(matrix_invert(transform));
+    matrix_t norm_transform = matrix_transpose(matrix_inverse(transform));
 
     int vertex_count = builder->data.vertex_count;
 

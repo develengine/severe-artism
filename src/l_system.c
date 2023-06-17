@@ -638,7 +638,7 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
         } break;
 
         case l_inst_Rotation: /* fallthrough */
-        case l_inst_Scale:    /* fallthrough */
+        case l_inst_Stretch:  /* fallthrough */
         case l_inst_Position:
         {
             assert(data_size >= 3);
@@ -658,7 +658,7 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
                                                          y.data.floating,
                                                          z.data.floating);
                 }
-                else if (inst.id == l_inst_Scale) {
+                else if (inst.id == l_inst_Stretch) {
                     res.data.matrix = matrix_scale(x.data.floating,
                                                    y.data.floating,
                                                    z.data.floating);
@@ -671,6 +671,23 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
             }
 
             return (l_eval_res_t) { res, 3 };
+        } break;
+
+        case l_inst_Scale: {
+            assert(data_size >= 1);
+
+            l_value_t x = data_top[0];
+
+            if (x.type != l_basic_Float)
+                return (l_eval_res_t) { .error = "Matrix functions can take only float values!" };
+
+            l_value_t res = { .type = l_basic_Mat4 };
+
+            if (compute) {
+                res.data.matrix = matrix_scale(x.data.floating, x.data.floating, x.data.floating);
+            }
+
+            return (l_eval_res_t) { res, 1 };
         } break;
 
         case l_inst_Noop: {

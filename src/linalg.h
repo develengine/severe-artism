@@ -46,7 +46,7 @@ static inline matrix_t matrix_transpose(matrix_t m)
  *
  * Contributed by David Moore (See Mesa bug #6748)
  */
-static inline matrix_t matrix_invert(matrix_t mat)
+static inline matrix_t matrix_inverse(matrix_t mat)
 {
     matrix_t res;
 

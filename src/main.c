@@ -1,5 +1,6 @@
 /* TODO:
- * [ ] Properly compute normal matrices when merging in model builder.
+ * [X] Properly compute normal matrices when merging in model builder.
+ * [X] Redo scale function and add stretch function.
  * [ ] Add mouse scroll to the text editor.
  * [ ] Add errors to editor.
  * [ ] Add syntax highlighting to the text editor.
@@ -166,8 +167,8 @@ int bagE_main(int argc, char *argv[])
 "res hair = sphere(3, rat_tex)\n"
 "\n"
 "def symbol_1(n: int) {\n"
-"    head(position(float(n), 0.0, 0.0))\n"
-"    hair(position(float(n), 2.5, -0.25))\n"
+"    head(position(float(n), 0.0, 0.0) * scale(n * 0.75))\n"
+"    hair(position(float(n), 2.5 * n * 0.75, -0.25 * n * 0.75) * scale(n * 0.75))\n"
 "}\n"
 "\n"
 "# this is a rewriting rule, it matches\n"
@@ -295,7 +296,7 @@ int bagE_main(int argc, char *argv[])
             (float)window_width,
             (float)window_height,
             0.1f,
-            100.0f
+            500.0f
         );
 
         matrix_t vp = matrix_multiply(proj, view);

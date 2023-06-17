@@ -39,8 +39,9 @@ typedef enum
     token_kw_Mat,
 
     token_kw_Rotation,
-    token_kw_Scale,
+    token_kw_Stretch,
     token_kw_Position,
+    token_kw_Scale,
 
     token_kw_PI,
     token_kw_PHI,

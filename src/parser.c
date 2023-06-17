@@ -40,8 +40,9 @@ static const char *keywords[] = {
     [token_kw_Mat]      = "mat",
 
     [token_kw_Rotation] = "rotation",
-    [token_kw_Scale]    = "scale",
+    [token_kw_Stretch]  = "stretch",
     [token_kw_Position] = "position",
+    [token_kw_Scale]    = "scale",
 
     [token_kw_PI]       = "PI",
     [token_kw_PHI]      = "PHI",
@@ -127,8 +128,9 @@ static int kw_arg_counts[] = {
     [token_kw_Mat] = -1,
 
     [token_kw_Rotation] = 3,
-    [token_kw_Scale] = 3,
+    [token_kw_Stretch] = 3,
     [token_kw_Position] = 3,
+    [token_kw_Scale] = 1,
 
     [token_kw_PI] = 0,
     [token_kw_PHI] = 0,
@@ -152,8 +154,9 @@ static l_instruction_t kw_instructions[] = {
     [token_kw_Mat] = {0},
 
     [token_kw_Rotation] = { .id = l_inst_Rotation },
-    [token_kw_Scale] = { .id = l_inst_Scale },
+    [token_kw_Stretch] = { .id = l_inst_Stretch },
     [token_kw_Position] = { .id = l_inst_Position },
+    [token_kw_Scale] = { .id = l_inst_Scale },
 
     [token_kw_PI] = { .id = l_inst_Value,
                       .op = { .type = l_basic_Float, .data.floating = 3.1415927f } },

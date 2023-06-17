@@ -76,8 +76,9 @@ typedef enum
     l_inst_CastBool,
 
     l_inst_Rotation,
-    l_inst_Scale,
+    l_inst_Stretch,
     l_inst_Position,
+    l_inst_Scale,
 
     l_inst_Noop,
 
@@ -135,12 +136,12 @@ static inline void fprint_instruction(l_instruction_t inst, FILE *file)
         case l_inst_CastFloat: { fprintf(file, "cast float\n"); } break;
         case l_inst_CastBool: { fprintf(file, "cast bool\n"); } break;
         case l_inst_Rotation: { fprintf(file, "rotation\n"); } break;
-        case l_inst_Scale: { fprintf(file, "scale\n"); } break;
+        case l_inst_Stretch: { fprintf(file, "stretch\n"); } break;
         case l_inst_Position: { fprintf(file, "position\n"); } break;
+        case l_inst_Scale: { fprintf(file, "scale\n"); } break;
         case l_inst_Noop: { fprintf(file, "noop\n"); } break;
 
-        default:
-            assert(0 && "unknown value");
+        case L_INST_COUNT: unreachable();
     }
 }
 
