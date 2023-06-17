@@ -195,67 +195,86 @@ typedef struct
 
 typedef struct
 {
-    l_value_t *data_buffers[2];
-    unsigned data_lengths[2];
-    unsigned data_capacities[2];
-
-    l_symbol_t *buffers[2];
-    unsigned lengths[2];
-    unsigned capacities[2];
+    dck_stretchy_t (l_value_t,  unsigned) values [2];
+    dck_stretchy_t (l_symbol_t, unsigned) symbols[2];
 
     unsigned id;
 
     /* code */
-    l_instruction_t *instructions;
-    unsigned instruction_count, instruction_capacity;
+    dck_stretchy_t (l_instruction_t, unsigned) instructions;
 
     /* types */
-    l_type_load_t *type_loads;
-    unsigned type_load_count, type_load_capacity;
-
-    l_basic_t *param_types;
-    unsigned param_type_count, param_type_capacity;
-
-    l_type_t *types;
-    unsigned type_count, type_capacity;
+    dck_stretchy_t (l_type_load_t, unsigned) type_loads;
+    dck_stretchy_t (l_basic_t,     unsigned) param_types;
+    dck_stretchy_t (l_type_t,      unsigned) types;
 
     /* rules */
-    l_expr_t *params;
-    unsigned param_count, param_capacity;
-
-    l_result_t *results;
-    unsigned result_count, result_capacity;
-
-    // TODO: Optimize type matching.
-    //       We can make an offset list on top for
-    //       individual type indices.
-    l_rule_t *rules;
-    unsigned rule_count, rule_capacity;
+    dck_stretchy_t (l_expr_t,   unsigned) params;
+    dck_stretchy_t (l_result_t, unsigned) results;
+    dck_stretchy_t (l_rule_t,   unsigned) rules;
+    // TODO: Optimize type matching. We can make an offset list on top for individual type indices.
 
     /* evaluation stack */
-    l_value_t *eval_stack;
-    unsigned eval_stack_size, eval_stack_capacity;
+    dck_stretchy_t (l_value_t, unsigned) eval_stack;
 
-    /* textures */
-    texture_data_t *textures;
-    unsigned texture_count, texture_capacity;
-
-    /* models */
-    model_data_t *models;
-    unsigned model_count, model_capacity;
-
-    /* rescources */
-    l_resource_t *resources;
-    unsigned resource_count, resource_capacity;
+    /* resources */
+    dck_stretchy_t (texture_data_t, unsigned) textures;
+    dck_stretchy_t (model_data_t,   unsigned) models;
+    dck_stretchy_t (l_resource_t,   unsigned) resources;
 
     /* atlas stuff */
-    rect_t *views;
-    unsigned view_count, view_capacity;
-
+    dck_stretchy_t (rect_t, unsigned) views;
     texture_data_t atlas;
-
     unsigned atlas_texture;
 } l_system_t;
+
+static inline void l_system_reset(l_system_t *sys)
+{
+    sys->instructions.count = 0;
+    sys->type_loads.count   = 0;
+    sys->param_types.count  = 0;
+    sys->types.count        = 0;
+    sys->params.count       = 0;
+    sys->results.count      = 0;
+    sys->rules.count        = 0;
+    sys->eval_stack.count   = 0;
+    sys->views.count        = 0;
+
+    for (unsigned i = 0; i < sys->textures.count; ++i) {
+        free_texture_data(sys->textures.data[i]);
+    }
+
+    for (unsigned i = 0; i < sys->models.count; ++i) {
+        free_model_data(sys->models.data[i]);
+    }
+
+    for (unsigned i = 0; i < sys->resources.count; ++i) {
+        free_model_data(sys->resources.data[i].model);
+    }
+
+    sys->models.count    = 0;
+    sys->textures.count  = 0;
+    sys->resources.count = 0;
+
+    free_texture_data(sys->atlas);
+    sys->atlas.data = NULL;
+
+    glDeleteTextures(1, &sys->atlas_texture);
+    sys->atlas_texture = 0;
+}
+
+static inline void l_system_empty(l_system_t *sys)
+{
+    sys->values[0].count = 0;
+    sys->values[1].count = 0;
+
+    sys->symbols[0].count = 0;
+    sys->symbols[1].count = 0;
+
+    sys->id = 0;
+}
+
+
 
 unsigned l_system_add_type(l_system_t *sys,
                            l_basic_t     *types, unsigned type_count,
@@ -269,7 +288,6 @@ void l_system_add_rule(l_system_t *sys,
                        l_expr_t *params,
                        int right_size);
 
-void l_system_empty(l_system_t *sys);
 void l_system_append(l_system_t *sys, unsigned type, l_value_t *params);
 
 typedef struct

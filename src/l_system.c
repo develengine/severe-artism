@@ -8,35 +8,34 @@
 unsigned l_system_add_type(l_system_t *sys,
                            l_basic_t     *types, unsigned type_count,
                            l_type_load_t *loads, unsigned load_count)
-// unsigned l_system_add_type(l_system_t *sys, l_basic_t *types, int count)
 {
-    safe_reserve(sys->param_types, sys->param_type_count, sys->param_type_capacity, type_count);
-    safe_reserve(sys->type_loads, sys->type_load_count, sys->type_load_capacity, load_count);
+    dck_stretchy_reserve(sys->param_types, type_count);
+    dck_stretchy_reserve(sys->type_loads,  load_count);
 
-    unsigned id = sys->type_count;
+    unsigned id = sys->types.count;
 
-    unsigned params_index = sys->param_type_count;
+    unsigned params_index = sys->param_types.count;
 
     for (unsigned i = 0; i < type_count; ++i) {
-        sys->param_types[params_index + i] = types[i];
+        sys->param_types.data[params_index + i] = types[i];
     }
 
-    sys->param_type_count += type_count;
+    sys->param_types.count += type_count;
 
-    unsigned load_index = sys->type_load_count;
+    unsigned load_index = sys->type_loads.count;
 
     for (unsigned i = 0; i < load_count; ++i) {
-        sys->type_loads[load_index + i] = loads[i];
+        sys->type_loads.data[load_index + i] = loads[i];
     }
 
-    sys->type_load_count += load_count;
+    sys->type_loads.count += load_count;
 
     l_type_t type = {
         .params_index = params_index, .params_count = type_count,
         .load_index   = load_index,   .load_count   = load_count,
     };
 
-    safe_push(sys->types, sys->type_count, sys->type_capacity, type);
+    dck_stretchy_push(sys->types, type);
 
     return id;
 }
@@ -44,15 +43,15 @@ unsigned l_system_add_type(l_system_t *sys,
 
 l_expr_t l_system_add_code(l_system_t *sys, l_instruction_t *instructions, int count)
 {
-    safe_reserve(sys->instructions, sys->instruction_count, sys->instruction_capacity, count);
+    dck_stretchy_reserve(sys->instructions, count);
 
-    unsigned index = sys->instruction_count;
+    unsigned index = sys->instructions.count;
 
     for (int i = 0; i < count; ++i) {
-        sys->instructions[index + i] = instructions[i];
+        sys->instructions.data[index + i] = instructions[i];
     }
 
-    sys->instruction_count += count;
+    sys->instructions.count += count;
 
 
     return (l_expr_t) { index, count };
@@ -69,29 +68,28 @@ void l_system_add_rule(l_system_t *sys,
 
     for (int i = 0; i < right_size; ++i) {
         unsigned type = right_types[i];
-        acc_param_count += sys->types[type].params_count;
+        acc_param_count += sys->types.data[type].params_count;
     }
 
-    safe_reserve(sys->params, sys->param_count, sys->param_capacity, acc_param_count);
+    dck_stretchy_reserve(sys->params, acc_param_count);
+    dck_stretchy_reserve(sys->results, right_size);
 
-    safe_reserve(sys->results, sys->result_count, sys->result_capacity, right_size);
-
-    unsigned right_index = sys->result_count;
+    unsigned right_index = sys->results.count;
     unsigned param_pos = 0;
 
     for (int ri = 0; ri < right_size; ++ri) {
         unsigned type = right_types[ri];
-        unsigned params_count = sys->types[type].params_count;
-        unsigned params_index = sys->param_count;
+        unsigned params_count = sys->types.data[type].params_count;
+        unsigned params_index = sys->params.count;
 
         for (unsigned pi = 0; pi < params_count; ++pi) {
-            sys->params[params_index + pi] = params[param_pos + pi];
+            sys->params.data[params_index + pi] = params[param_pos + pi];
         }
 
-        sys->param_count += params_count;
+        sys->params.count += params_count;
 
 
-        sys->results[right_index + ri] = (l_result_t) {
+        sys->results.data[right_index + ri] = (l_result_t) {
             .type = type,
             .params_index = params_index,
         };
@@ -99,7 +97,7 @@ void l_system_add_rule(l_system_t *sys,
         param_pos += params_count;
     }
 
-    sys->result_count += right_size;
+    sys->results.count += right_size;
 
 
     l_rule_t rule = {
@@ -108,35 +106,22 @@ void l_system_add_rule(l_system_t *sys,
         .right_size = right_size,
     };
 
-    safe_push(sys->rules, sys->rule_count, sys->rule_capacity, rule);
-}
-
-
-void l_system_empty(l_system_t *sys)
-{
-    sys->data_lengths[0] = 0;
-    sys->data_lengths[1] = 0;
-    sys->lengths[0] = 0;
-    sys->lengths[1] = 0;
-    sys->id = 0;
+    dck_stretchy_push(sys->rules, rule);
 }
 
 
 void l_system_append(l_system_t *sys, unsigned type, l_value_t *params)
 {
-    unsigned param_count = sys->types[type].params_count;
-    unsigned data_index = sys->data_lengths[sys->id];
+    unsigned param_count = sys->types.data[type].params_count;
+    unsigned data_index = sys->values[sys->id].count;
 
-    safe_reserve(sys->data_buffers[sys->id],
-                 sys->data_lengths[sys->id],
-                 sys->data_capacities[sys->id],
-                 param_count);
+    dck_stretchy_reserve(sys->values[sys->id], param_count);
 
     for (unsigned i = 0; i < param_count; ++i) {
-        sys->data_buffers[sys->id][data_index + i] = params[i];
+        sys->values[sys->id].data[data_index + i] = params[i];
     }
 
-    sys->data_lengths[sys->id] += param_count;
+    sys->values[sys->id].count += param_count;
 
 
     l_symbol_t symbol = {
@@ -144,7 +129,7 @@ void l_system_append(l_system_t *sys, unsigned type, l_value_t *params)
         .data_index = data_index,
     };
 
-    safe_push(sys->buffers[sys->id], sys->lengths[sys->id], sys->capacities[sys->id], symbol);
+    dck_stretchy_push(sys->symbols[sys->id], symbol);
 }
 
 
@@ -152,14 +137,14 @@ char *l_system_update(l_system_t *sys)
 {
     unsigned next_id = 1 - sys->id;
 
-    sys->data_lengths[next_id] = 0;
-    sys->lengths[next_id] = 0;
+    sys->values [next_id].count = 0;
+    sys->symbols[next_id].count = 0;
 
-    for (unsigned sym_id = 0; sym_id < sys->lengths[sys->id]; ++sym_id) {
-        l_symbol_t symbol = sys->buffers[sys->id][sym_id];
+    for (unsigned sym_id = 0; sym_id < sys->symbols[sys->id].count; ++sym_id) {
+        l_symbol_t symbol = sys->symbols[sys->id].data[sym_id];
 
-        for (unsigned rule_id = 0; rule_id < sys->rule_count; ++rule_id) {
-            l_rule_t rule = sys->rules[rule_id];
+        for (unsigned rule_id = 0; rule_id < sys->rules.count; ++rule_id) {
+            l_rule_t rule = sys->rules.data[rule_id];
 
             if (rule.left.type != symbol.type)
                 continue;
@@ -182,33 +167,26 @@ char *l_system_update(l_system_t *sys)
             unsigned acc_param_count = 0;
 
             for (unsigned i = 0; i < rule.right_size; ++i) {
-                l_type_t type = sys->types[sys->results[rule.right_index + i].type];
+                l_type_t type = sys->types.data[sys->results.data[rule.right_index + i].type];
                 acc_param_count += type.params_count;
             }
 
-            safe_reserve(sys->data_buffers[next_id],
-                         sys->data_lengths[next_id],
-                         sys->data_capacities[next_id],
-                         acc_param_count);
+            dck_stretchy_reserve(sys->values [next_id], acc_param_count);
+            dck_stretchy_reserve(sys->symbols[next_id], rule.right_size);
 
-            safe_reserve(sys->buffers[next_id],
-                         sys->lengths[next_id],
-                         sys->capacities[next_id],
-                         rule.right_size);
-
-            unsigned symbol_index = sys->lengths[next_id];
+            unsigned symbol_index = sys->symbols[next_id].count;
 
             for (unsigned ri = 0; ri < rule.right_size; ++ri) {
-                unsigned data_index = sys->data_lengths[next_id];
+                unsigned data_index = sys->values[next_id].count;
 
-                l_result_t result = sys->results[rule.right_index + ri];
+                l_result_t result = sys->results.data[rule.right_index + ri];
 
-                l_type_t type = sys->types[result.type];
-                l_basic_t *param_types = sys->param_types + type.params_index;
+                l_type_t type = sys->types.data[result.type];
+                l_basic_t *param_types = sys->param_types.data + type.params_index;
 
                 for (unsigned pi = 0; pi < type.params_count; ++pi) {
                     l_eval_res_t ret = l_evaluate(sys,
-                                                  sys->params[result.params_index + pi],
+                                                  sys->params.data[result.params_index + pi],
                                                   true,
                                                   result.type,
                                                   symbol.data_index,
@@ -219,12 +197,12 @@ char *l_system_update(l_system_t *sys)
 
                     assert(ret.val.type == param_types[pi]);
 
-                    sys->data_buffers[next_id][data_index + pi] = ret.val;
+                    sys->values[next_id].data[data_index + pi] = ret.val;
                 }
 
-                sys->data_lengths[next_id] += type.params_count;
+                sys->values[next_id].count += type.params_count;
 
-                sys->buffers[next_id][symbol_index] = (l_symbol_t) {
+                sys->symbols[next_id].data[symbol_index] = (l_symbol_t) {
                     .type = result.type,
                     .data_index = data_index
                 };
@@ -232,7 +210,7 @@ char *l_system_update(l_system_t *sys)
                 ++symbol_index;
             }
 
-            sys->lengths[next_id] += rule.right_size;
+            sys->symbols[next_id].count += rule.right_size;
         }
     }
 
@@ -243,14 +221,14 @@ char *l_system_update(l_system_t *sys)
 
 void l_system_print(l_system_t *sys)
 {
-    for (unsigned i = 0; i < sys->lengths[sys->id]; ++i) {
-        l_symbol_t sym = sys->buffers[sys->id][i];
+    for (unsigned i = 0; i < sys->symbols[sys->id].count; ++i) {
+        l_symbol_t sym = sys->symbols[sys->id].data[i];
 
-        l_type_t type = sys->types[sym.type];
-        l_basic_t *param_types = sys->param_types + type.params_index;
+        l_type_t type = sys->types.data[sym.type];
+        l_basic_t *param_types = sys->param_types.data + type.params_index;
         unsigned param_count = type.params_count;
 
-        l_value_t *data = sys->data_buffers[sys->id] + sym.data_index;
+        l_value_t *data = sys->values[sys->id].data + sym.data_index;
 
         printf("%d (", sym.type);
 
@@ -717,13 +695,13 @@ l_eval_res_t l_evaluate(l_system_t *sys,
                         unsigned data_index,
                         bool compute)
 {
-    l_value_t *params = sys->data_buffers[sys->id] + data_index;
-    l_instruction_t *code = sys->instructions + expr.index;
+    l_value_t *params = sys->values[sys->id].data + data_index;
+    l_instruction_t *code = sys->instructions.data + expr.index;
 
     unsigned param_count = 0;
 
     if (has_params) {
-        l_type_t type = sys->types[type_index];
+        l_type_t type = sys->types.data[type_index];
         param_count = type.params_count;
     }
 
@@ -732,21 +710,21 @@ l_eval_res_t l_evaluate(l_system_t *sys,
         l_instruction_t inst = code[i];
 
         l_eval_res_t res = l_evaluate_instruction(inst, params, param_count,
-                                                  sys->eval_stack + sys->eval_stack_size - 1,
-                                                  sys->eval_stack_size,
+                                                  sys->eval_stack.data + sys->eval_stack.count - 1,
+                                                  sys->eval_stack.count,
                                                   compute);
         if (res.error)
             return res;
 
-        sys->eval_stack_size -= res.eaten;
+        sys->eval_stack.count -= res.eaten;
 
-        safe_push(sys->eval_stack, sys->eval_stack_size, sys->eval_stack_capacity, res.val);
+        dck_stretchy_push(sys->eval_stack, res.val);
     }
 
-    assert(sys->eval_stack_size == 1);
+    assert(sys->eval_stack.count == 1);
 
-    l_value_t res = sys->eval_stack[sys->eval_stack_size - 1];
-    sys->eval_stack_size = 0;
+    l_value_t res = sys->eval_stack.data[sys->eval_stack.count - 1];
+    sys->eval_stack.count = 0;
 
     return (l_eval_res_t) { res };
 }
@@ -756,12 +734,12 @@ l_build_t l_system_build(l_system_t *sys)
 {
     model_builder_t builder = {0};
 
-    for (unsigned i = 0; i < sys->lengths[sys->id]; ++i) {
-        l_symbol_t sym = sys->buffers[sys->id][i];
-        l_type_t type = sys->types[sym.type];
+    for (unsigned i = 0; i < sys->symbols[sys->id].count; ++i) {
+        l_symbol_t sym = sys->symbols[sys->id].data[i];
+        l_type_t type = sys->types.data[sym.type];
 
         for (unsigned lid = 0; lid < type.load_count; ++lid) {
-            l_type_load_t load = sys->type_loads[type.load_index + lid];
+            l_type_load_t load = sys->type_loads.data[type.load_index + lid];
             
             l_eval_res_t res = l_evaluate(sys, load.expr, true, sym.type, sym.data_index, true);
 
@@ -771,7 +749,7 @@ l_build_t l_system_build(l_system_t *sys)
             assert(res.val.type == l_basic_Mat4);
 
             model_builder_merge(&builder,
-                                sys->resources[load.resource_index].model,
+                                sys->resources.data[load.resource_index].model,
                                 res.val.data.matrix);
         }
     }

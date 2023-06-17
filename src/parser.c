@@ -569,6 +569,13 @@ static expr_rec_t expr_err(tokenizer_t *toki, token_t token, char *msg)
 }
 
 
+#define next_checked_token(token, toki) \
+do {                                    \
+    token = tokenizer_next(toki, true); \
+    if (token.type == token_type_Error) \
+        goto bad_token;                 \
+} while (0)
+
 
 static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
                                  sv_t *param_names, l_value_t *params, unsigned param_count,
@@ -608,9 +615,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
             if (!ret.res.success)
                 return ret;
 
-            token = tokenizer_next(toki, true);
-            if (token.type == token_type_Error)
-                return (expr_rec_t) { token_to_result(toki, token) };
+            next_checked_token(token, toki);
 
             if (token.type != token_type_Separator || token.meta.sep != ')')
                 return expr_err(toki, token, "Expected ')', closing parenthesis!");
@@ -646,10 +651,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
 
             temp_stack[temp_size++].type = instruction.op.type;
 
-            safe_push(sys->instructions,
-                      sys->instruction_count,
-                      sys->instruction_capacity,
-                      instruction);
+            dck_stretchy_push(sys->instructions, instruction);
         } break;
 
         /* parameters */
@@ -670,10 +672,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
 
                 temp_stack[temp_size++].type = params[i].type;
 
-                safe_push(sys->instructions,
-                          sys->instruction_count,
-                          sys->instruction_capacity,
-                          instruction);
+                dck_stretchy_push(sys->instructions, instruction);
 
                 found = true;
                 break;
@@ -692,9 +691,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
                 return expr_err(toki, token, "Illegal keyword in context!");
 
             if (argc > 0) {
-                token = tokenizer_next(toki, true);
-                if (token.type == token_type_Error)
-                    return (expr_rec_t) { token_to_result(toki, token) };
+                next_checked_token(token, toki);
 
                 if (token.type != token_type_Separator || token.meta.sep != '(') {
                     return expr_err(toki, token,
@@ -703,9 +700,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
 
                 for (int i = 0; i < argc; ++i) {
                     if (i != 0) {
-                        token = tokenizer_next(toki, true);
-                        if (token.type == token_type_Error)
-                            return (expr_rec_t) { token_to_result(toki, token) };
+                        next_checked_token(token, toki);
 
                         if (token.type != token_type_Separator || token.meta.sep != ',') {
                             return expr_err(toki, token,
@@ -722,9 +717,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
                     temp_stack[temp_size++].type = ret.type;
                 }
 
-                token = tokenizer_next(toki, true);
-                if (token.type == token_type_Error)
-                    return (expr_rec_t) { token_to_result(toki, token) };
+                next_checked_token(token, toki);
 
                 if (token.type != token_type_Separator || token.meta.sep != ')')
                     return expr_err(toki, token, "Expected ')', closing parenthesis!");
@@ -743,10 +736,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
             temp_size -= eval_res.eaten;
             temp_stack[temp_size++].type = eval_res.val.type;
 
-            safe_push(sys->instructions,
-                      sys->instruction_count,
-                      sys->instruction_capacity,
-                      inst);
+            dck_stretchy_push(sys->instructions, inst);
         } break;
 
         /* unary operators */
@@ -775,9 +765,7 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
     /* operators */
     for (;;) {
         if (!has_unary) {
-            token = tokenizer_next(toki, true);
-            if (token.type == token_type_Error)
-                return (expr_rec_t) { token_to_result(toki, token) };
+            next_checked_token(token, toki);
 
             if (token.type == token_type_Empty)
                 return (expr_rec_t) { .res = { .success = true } };
@@ -831,11 +819,11 @@ static expr_rec_t expression_rec(tokenizer_t *toki, l_system_t *sys,
         temp_size -= eval_res.eaten;
         temp_stack[temp_size++].type = eval_res.val.type;
 
-        safe_push(sys->instructions,
-                  sys->instruction_count,
-                  sys->instruction_capacity,
-                  instruction);
+        dck_stretchy_push(sys->instructions, instruction);
     }
+
+bad_token:
+    return (expr_rec_t) { token_to_result(toki, token) };
 }
 
 // FIXME: Nasty hack to use the interpreter for type checking.
@@ -851,14 +839,14 @@ parse_expr_res_t parse_expression(tokenizer_t *toki, l_system_t *sys,
         temp_vals[i].type = param_types[i];
     }
 
-    unsigned index = sys->instruction_count;
+    unsigned index = sys->instructions.count;
 
     expr_rec_t ret = expression_rec(toki, sys, param_names, temp_vals, param_count,
                                     NO_PRECEDENCE);
     if (!ret.res.success)
         return (parse_expr_res_t) { ret.res };
 
-    unsigned count = sys->instruction_count - index;
+    unsigned count = sys->instructions.count - index;
 
     return (parse_expr_res_t) {
         .res = { .success = true },
@@ -872,29 +860,26 @@ static parse_result_t parse_texture(parse_state_t *state, tokenizer_t *toki, l_s
 {
     token_t token;
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Identifier)
         return err(toki, token, "Expected identifier!");
 
     sv_t name = token.data;
 
-    for (unsigned i = 0; i < state->tex_count; ++i) {
-        if (sv_eq(name, state->tex_names[i]))
+    for (unsigned i = 0; i < state->tex_names.count; ++i) {
+        if (sv_eq(name, state->tex_names.data[i]))
             return err(toki, token, "Texture name already exists!");
     }
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '(')
         return err(toki, token, "Expected '(', opening parenthesis!");
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Literal || token.meta.lit != token_lit_String)
         return err(toki, token, "Expected string!");
@@ -902,8 +887,7 @@ static parse_result_t parse_texture(parse_state_t *state, tokenizer_t *toki, l_s
     sv_t path = { .begin = token.data.begin + 1, .end = token.data.end - 1 };
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != ')')
         return err(toki, token, "Expected ')', closing parenthesis!");
@@ -919,10 +903,13 @@ static parse_result_t parse_texture(parse_state_t *state, tokenizer_t *toki, l_s
         return err(toki, token, "Can't load this texture path!");
 
 
-    safe_push(state->tex_names, state->tex_count, state->tex_capacity, name);
-    safe_push(sys->textures, sys->texture_count, sys->texture_capacity, tex);
+    dck_stretchy_push(state->tex_names, name);
+    dck_stretchy_push(sys->textures, tex);
 
     return (parse_result_t) { .success = true };
+
+bad_token:
+    return token_to_result(toki, token);
 }
 
 
@@ -930,29 +917,26 @@ static parse_result_t parse_model(parse_state_t *state, tokenizer_t *toki, l_sys
 {
     token_t token;
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Identifier)
         return err(toki, token, "Expected identifier!");
 
     sv_t name = token.data;
 
-    for (unsigned i = 0; i < state->mod_count; ++i) {
-        if (sv_eq(name, state->mod_names[i]))
+    for (unsigned i = 0; i < state->mod_names.count; ++i) {
+        if (sv_eq(name, state->mod_names.data[i]))
             return err(toki, token, "Model name already exists!");
     }
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '(')
         return err(toki, token, "Expected '(', opening parenthesis!");
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Literal || token.meta.lit != token_lit_String)
         return err(toki, token, "Expected string!");
@@ -960,8 +944,7 @@ static parse_result_t parse_model(parse_state_t *state, tokenizer_t *toki, l_sys
 
     sv_t path = { .begin = token.data.begin + 1, .end = token.data.end - 1 };
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != ')')
         return err(toki, token, "Expected ')', closing parenthesis!");
@@ -977,10 +960,13 @@ static parse_result_t parse_model(parse_state_t *state, tokenizer_t *toki, l_sys
         return err(toki, token, "Can't load this model path!");
 
 
-    safe_push(state->mod_names, state->mod_count, state->mod_capacity, name);
-    safe_push(sys->models, sys->model_count, sys->model_capacity, mod);
+    dck_stretchy_push(state->mod_names, name);
+    dck_stretchy_push(sys->models, mod);
 
     return (parse_result_t) { .success = true };
+
+bad_token:
+    return token_to_result(toki, token);
 }
 
 
@@ -988,29 +974,26 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
 {
     token_t token;
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Identifier)
         return err(toki, token, "Expected identifier!");
 
     sv_t name = token.data;
 
-    for (unsigned i = 0; i < state->res_count; ++i) {
-        if (sv_eq(name, state->res_names[i]))
+    for (unsigned i = 0; i < state->res_names.count; ++i) {
+        if (sv_eq(name, state->res_names.data[i]))
             return err(toki, token, "Resource name already exists!");
     }
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '=')
         return err(toki, token, "Expected '=', equals sign!");
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Keyword)
         return err(toki, token, "Expected a resource function keyword!");
@@ -1018,8 +1001,7 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
     token_kw_t kw = token.meta.kw;
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '(')
         return err(toki, token, "Expected '(', opening parenthesis!");
@@ -1058,8 +1040,7 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
         }
     }
     else if (kw == token_kw_Object) {
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Identifier)
             return err(toki, token, "Expected a model identifier!");
@@ -1067,30 +1048,28 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
         sv_t mod_name = token.data;
 
         unsigned index = 0;
-        for (; index < state->mod_count; ++index) {
-            if (sv_eq(mod_name, state->mod_names[index]))
+        for (; index < state->mod_names.count; ++index) {
+            if (sv_eq(mod_name, state->mod_names.data[index]))
                 break;
         }
 
-        if (index == state->mod_count)
+        if (index == state->mod_names.count)
             return err(toki, token, "Unknown model name!");
 
-        first_arg = copy_model_data(sys->models[index]);
+        first_arg = copy_model_data(sys->models.data[index]);
     }
     else {
         return err(toki, token, "Unknown resource function!");
     }
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != ',')
         return err(toki, token, "Expected ',', argument separating comma!");
 
     
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Identifier)
         return err(toki, token, "Expected a texture identifier!");
@@ -1098,17 +1077,16 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
     sv_t tex_name = token.data;
 
     unsigned second_arg = 0;
-    for (; second_arg < state->tex_count; ++second_arg) {
-        if (sv_eq(tex_name, state->tex_names[second_arg]))
+    for (; second_arg < state->tex_names.count; ++second_arg) {
+        if (sv_eq(tex_name, state->tex_names.data[second_arg]))
             break;
     }
 
-    if (second_arg == state->tex_count)
+    if (second_arg == state->tex_names.count)
         return err(toki, token, "Unknown texture name!");
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != ')')
         return err(toki, token, "Expected ')', closing parenthesis!");
@@ -1119,10 +1097,13 @@ static parse_result_t parse_resource(parse_state_t *state, tokenizer_t *toki, l_
         .texture_index = second_arg,
     };
 
-    safe_push(state->res_names, state->res_count, state->res_capacity, name);
-    safe_push(sys->resources, sys->resource_count, sys->resource_capacity, resource);
+    dck_stretchy_push(state->res_names, name);
+    dck_stretchy_push(sys->resources, resource);
 
     return (parse_result_t) { .success = true };
+
+bad_token:
+    return token_to_result(toki, token);
 }
 
 
@@ -1137,8 +1118,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
 {
     token_t token;
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Identifier)
         return err(toki, token, "Expected identifier!");
@@ -1146,8 +1126,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
     sv_t name = token.data;
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '(')
         return err(toki, token, "Expected '(', opening parenthesis!");
@@ -1157,8 +1136,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
 
     for (;;) {
         if (param_count > 0) {
-            if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-                return token_to_result(toki, token);
+            next_checked_token(token, toki);
 
             if (token.type != token_type_Separator
              || (token.meta.sep != ',' && token.meta.sep != ')'))
@@ -1168,8 +1146,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
                 break;
         }
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type == token_type_Separator) {
             if (token.meta.sep == ')')
@@ -1184,15 +1161,13 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
         sv_t param_name = token.data;
 
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Separator || token.meta.sep != ':')
             return err(toki, token, "Expected ':', type specifier comma!");
 
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Keyword)
             return err(toki, token, "Expected a type keyword!");
@@ -1216,8 +1191,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
         ++param_count;
     }
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '{')
         return err(toki, token, "Expected '{', opening braces!");
@@ -1226,8 +1200,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
     unsigned load_count = 0;
 
     for (;;) {
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type == token_type_Separator) {
             if (token.meta.sep != '}')
@@ -1242,17 +1215,16 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
         sv_t res_name = token.data;
 
         unsigned res_index = 0;
-        for (; res_index < state->res_count; ++res_index) {
-            if (sv_eq(res_name, state->res_names[res_index]))
+        for (; res_index < state->res_names.count; ++res_index) {
+            if (sv_eq(res_name, state->res_names.data[res_index]))
                 break;
         }
 
-        if (res_index == state->res_count)
+        if (res_index == state->res_names.count)
             return err(toki, token, "Unknown resource name!");
 
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Separator || token.meta.sep != '(')
             return err(toki, token, "Expected '(', opening parenthesis!");
@@ -1266,8 +1238,7 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
             return err(toki, token, "Expression needs to be of type `mat`!");
 
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Separator || token.meta.sep != ')')
             return err(toki, token, "Expected ')', closing parenthesis!");
@@ -1281,20 +1252,23 @@ static parse_result_t parse_define(parse_state_t *state, tokenizer_t *toki, l_sy
         ++load_count;
     }
 
-    safe_reserve(state->param_names, state->param_count, state->param_capacity, param_count);
+    dck_stretchy_reserve(state->param_names, param_count);
 
     for (unsigned i = 0; i < param_count; ++i) {
-        state->param_names[state->param_count + i] = temp_names[i];
+        state->param_names.data[state->param_names.count + i] = temp_names[i];
     }
 
-    state->param_count += param_count;
+    state->param_names.count += param_count;
 
-    safe_push(state->def_names, state->def_count, state->def_capacity, name);
+    dck_stretchy_push(state->def_names, name);
 
     l_system_add_type(sys, temp_types, param_count, temp_loads, load_count);
 
 
     return (parse_result_t) { .success = true };
+
+bad_token:
+    return token_to_result(toki, token);
 }
 
 
@@ -1306,8 +1280,7 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
 {
     token_t token;
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Identifier)
         return err(toki, token, "Expected type identifier!");
@@ -1315,20 +1288,20 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
     sv_t type_name = token.data;
 
     unsigned type_index = 0;
-    for (; type_index < state->def_count; ++type_index) {
-        if (sv_eq(type_name, state->def_names[type_index]))
+    for (; type_index < state->def_names.count; ++type_index) {
+        if (sv_eq(type_name, state->def_names.data[type_index]))
             break;
     }
 
-    if (type_index == state->def_count)
+    if (type_index == state->def_names.count)
         return err(toki, token, "Unknown type name!");
 
 
-    l_type_t type = sys->types[type_index];
+    l_type_t type = sys->types.data[type_index];
 
     parse_expr_res_t ret = parse_expression(toki, sys,
-                                            state->param_names + type.params_index,
-                                            sys->param_types + type.params_index,
+                                            state->param_names.data + type.params_index,
+                                            sys->param_types.data + type.params_index,
                                             type.params_count);
     if (!ret.res.success)
         return ret.res;
@@ -1339,8 +1312,7 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
     l_expr_t predicate = ret.expr;
 
 
-    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-        return token_to_result(toki, token);
+    next_checked_token(token, toki);
 
     if (token.type != token_type_Separator || token.meta.sep != '{')
         return err(toki, token, "Expected '{', opening braces!");
@@ -1350,8 +1322,7 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
     unsigned expr_count = 0;
 
     for (;;) {
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type == token_type_Separator) {
             if (token.meta.sep != '}')
@@ -1366,41 +1337,39 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
         sv_t def_name = token.data;
 
         unsigned def_index = 0;
-        for (; def_index < state->def_count; ++def_index) {
-            if (sv_eq(def_name, state->def_names[def_index]))
+        for (; def_index < state->def_names.count; ++def_index) {
+            if (sv_eq(def_name, state->def_names.data[def_index]))
                 break;
         }
 
-        if (def_index == state->def_count)
+        if (def_index == state->def_names.count)
             return err(toki, token, "Unknown type name!");
 
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Separator || token.meta.sep != '(')
             return err(toki, token, "Expected '(', opening parenthesis!");
 
 
-        l_type_t def_type = sys->types[def_index];
+        l_type_t def_type = sys->types.data[def_index];
 
         for (unsigned i = 0; i < def_type.params_count; ++i) {
             if (i > 0) {
-                if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-                    return token_to_result(toki, token);
+                next_checked_token(token, toki);
 
                 if (token.type != token_type_Separator || token.meta.sep != ',')
                     return err(toki, token, "Expected ',', argument separating comma!");
             }
 
             ret = parse_expression(toki, sys,
-                                   state->param_names + type.params_index,
-                                   sys->param_types + type.params_index,
+                                   state->param_names.data + type.params_index,
+                                   sys->param_types.data + type.params_index,
                                    type.params_count);
             if (!ret.res.success)
                 return ret.res;
 
-            if (ret.type != sys->param_types[def_type.params_index + i])
+            if (ret.type != sys->param_types.data[def_type.params_index + i])
                 return err(toki, token, "Expression type doesn't match argument!");
 
             assert(expr_count < MAX_PARAM_EXPRS);
@@ -1408,8 +1377,7 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
         }
 
 
-        if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type != token_type_Separator || token.meta.sep != ')')
             return err(toki, token, "Expected ')', closing parenthesis!");
@@ -1428,15 +1396,18 @@ static parse_result_t parse_rule(parse_state_t *state, tokenizer_t *toki, l_syst
     l_system_add_rule(sys, left, temp_body_types, temp_exprs, type_count);
 
     return (parse_result_t) { .success = true };
+
+bad_token:
+    return token_to_result(toki, token);
 }
 
 
 static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_system_t *sys)
 {
+    token_t token;
+
     for (;;) {
-        token_t token = tokenizer_next(toki, true);
-        if (token.type == token_type_Error)
-            return token_to_result(toki, token);
+        next_checked_token(token, toki);
 
         if (token.type == token_type_Empty)
             return (parse_result_t) { .success = true };
@@ -1489,28 +1460,26 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
             sv_t type_name = token.data;
 
             unsigned type_index = 0;
-            for (; type_index < state->def_count; ++type_index) {
-                if (sv_eq(type_name, state->def_names[type_index]))
+            for (; type_index < state->def_names.count; ++type_index) {
+                if (sv_eq(type_name, state->def_names.data[type_index]))
                     break;
             }
 
-            if (type_index == state->def_count)
+            if (type_index == state->def_names.count)
                 return err(toki, token, "Unknown type identifier");
 
 
-            if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-                return token_to_result(toki, token);
+            next_checked_token(token, toki);
 
             if (token.type != token_type_Separator || token.meta.sep != '(')
                 return err(toki, token, "Expected '(', opening parenthesis!");
 
 
-            l_type_t type = sys->types[type_index];
+            l_type_t type = sys->types.data[type_index];
 
             for (unsigned i = 0; i < type.params_count; ++i) {
                 if (i > 0) {
-                    if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-                        return token_to_result(toki, token);
+                    next_checked_token(token, toki);
 
                     if (token.type != token_type_Separator || token.meta.sep != ',')
                         return err(toki, token, "Expected ',', argument separating comma!");
@@ -1520,7 +1489,7 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
                 if (!ret.res.success)
                     return ret.res;
 
-                if (ret.type != sys->param_types[type.params_index + i])
+                if (ret.type != sys->param_types.data[type.params_index + i])
                     return err(toki, token, "Expression type doesn't match argument!");
 
                 l_eval_res_t val = l_evaluate(sys, ret.expr, false, 0, 0, true);
@@ -1532,8 +1501,7 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
                 temp_vals[i] = val.val;
             }
 
-            if ((token = tokenizer_next(toki, true)).type == token_type_Error)
-                return token_to_result(toki, token);
+            next_checked_token(token, toki);
 
             if (token.type != token_type_Separator || token.meta.sep != ')')
                 return err(toki, token, "Expected ')', closing parenthesis!");
@@ -1546,6 +1514,9 @@ static parse_result_t parse_document(parse_state_t *state, tokenizer_t *toki, l_
 
         return err(toki, token, "Expected a block keyword or type identifier!");
     }
+
+bad_token:
+    return token_to_result(toki, token);
 }
 
 
@@ -1554,41 +1525,8 @@ void parse(l_system_t *sys, parse_state_t *state, char *text, size_t text_size)
     /* empty everything */
     l_system_empty(sys);
 
-    sys->instruction_count = 0;
-    sys->type_load_count   = 0;
-    sys->param_type_count  = 0;
-    sys->type_count        = 0;
-    sys->param_count       = 0;
-    sys->result_count      = 0;
-    sys->rule_count        = 0;
-    sys->eval_stack_size   = 0;
-    sys->view_count        = 0;
-
-    state->tex_count       = 0;
-    state->mod_count       = 0;
-    state->res_count       = 0;
-    state->def_count       = 0;
-    state->param_count     = 0;
-
-    for (unsigned i = 0; i < sys->texture_count; ++i) {
-        free_texture_data(sys->textures[i]);
-    }
-    sys->texture_count = 0;
-
-    for (unsigned i = 0; i < sys->model_count; ++i) {
-        free_model_data(sys->models[i]);
-    }
-    sys->model_count = 0;
-
-    for (unsigned i = 0; i < sys->resource_count; ++i) {
-        free_model_data(sys->resources[i].model);
-    }
-    sys->resource_count = 0;
-
-    free_texture_data(sys->atlas);
-
-    glDeleteTextures(1, &sys->atlas_texture);
-
+    parse_state_reset(state);
+    l_system_reset(sys);
 
     /* parse */
     tokenizer_t toki = {
@@ -1603,22 +1541,22 @@ void parse(l_system_t *sys, parse_state_t *state, char *text, size_t text_size)
         return;
 
     /* create texture atlas */
-    if (sys->texture_count == 0) {
+    if (sys->textures.count == 0) {
         state->res.success = false;
         state->res.message = sv_l("No textures provided!");
         return;
     }
 
-    safe_reserve(sys->views, sys->view_count, sys->view_capacity, sys->texture_count);
+    dck_stretchy_reserve(sys->views, sys->textures.count);
 
-    sys->atlas = create_texture_atlas(sys->textures, sys->views, sys->texture_count);
+    sys->atlas = create_texture_atlas(sys->textures.data, sys->views.data, sys->textures.count);
     sys->atlas_texture = create_texture_object(sys->atlas);
 
-    for (unsigned i = 0; i < sys->resource_count; ++i) {
-        l_resource_t *res = sys->resources + i;
+    for (unsigned i = 0; i < sys->resources.count; ++i) {
+        l_resource_t *res = sys->resources.data + i;
         model_map_textures_to_view(
             &res->model,
-            frect_make(sys->views[res->texture_index], sys->atlas.width, sys->atlas.height)
+            frect_make(sys->views.data[res->texture_index], sys->atlas.width, sys->atlas.height)
         );
     }
 }

@@ -5,6 +5,7 @@
  * [ ] Add syntax highlighting to the text editor.
  * [ ] Make the text editor retractable.
  * [ ] Add way to export programs.
+ * [ ] Add a way to change iteration count.
  */
 
 #include "bag_engine.h"

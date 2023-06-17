@@ -129,21 +129,21 @@ typedef struct
 {
     parse_result_t res;
 
-    sv_t *tex_names;
-    unsigned tex_count, tex_capacity;
-
-    sv_t *mod_names;
-    unsigned mod_count, mod_capacity;
-
-    sv_t *res_names;
-    unsigned res_count, res_capacity;
-
-    sv_t *def_names;
-    unsigned def_count, def_capacity;
-
-    sv_t *param_names;
-    unsigned param_count, param_capacity;
+    dck_stretchy_t (sv_t, unsigned) tex_names;
+    dck_stretchy_t (sv_t, unsigned) mod_names;
+    dck_stretchy_t (sv_t, unsigned) res_names;
+    dck_stretchy_t (sv_t, unsigned) def_names;
+    dck_stretchy_t (sv_t, unsigned) param_names;
 } parse_state_t;
+
+static inline void parse_state_reset(parse_state_t *state)
+{
+    state->tex_names.count   = 0;
+    state->mod_names.count   = 0;
+    state->res_names.count   = 0;
+    state->def_names.count   = 0;
+    state->param_names.count = 0;
+}
 
 parse_expr_res_t parse_expression(tokenizer_t *toki, l_system_t *sys,
                                   sv_t *param_names, l_basic_t *param_types, unsigned param_count);
