@@ -32,7 +32,7 @@ static inline matrix_t matrix_transpose(matrix_t m)
 
     for (int y = 0; y < 4; ++y) {
         for (int x = 0; x < 4; ++x) {
-            res.data[y * 4 + x] = m.data[x * 4 + y];
+            res.data[x + y * 4] = m.data[y + x * 4];
         }
     }
 

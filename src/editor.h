@@ -1,22 +1,10 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 
-/* TODO:
- * [X] text selection, copying and pasting
- * [ ] line numbers
- * [ ] syntax token highlighting
- * [ ] error message marking
- * [ ] mouse scroll
- * [ ] extended keyboard navigation
- * [ ] vim mode
- */
-
 #include "gui.h"
 
 #include "bag_engine.h"
 
-#define EDITOR_WIDTH  100
-#define EDITOR_HEIGHT 40
 #define EDITOR_SCALE 8
 
 
@@ -33,10 +21,12 @@ typedef struct
 
     bool selecting;
     int selection_start;
+
+    int col_count, row_count;
 } editor_t;
 
 void editor_init(editor_t *editor);
-void editor_render(editor_t *editor, int x, int y);
+void editor_render(editor_t *editor, int x, int y, int col_count, int row_count);
 void editor_replace(editor_t *editor, int pos,   int dst_size,
                                       char *src, int src_size);
 
@@ -53,8 +43,8 @@ static inline rect_t editor_area(editor_t *editor, int x, int y)
 
     return (rect_t) {
         x, y,
-        EDITOR_WIDTH  * 1 * EDITOR_SCALE,
-        EDITOR_HEIGHT * 2 * EDITOR_SCALE,
+        editor->col_count * 1 * EDITOR_SCALE,
+        editor->row_count * 2 * EDITOR_SCALE,
     };
 }
 

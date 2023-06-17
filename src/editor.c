@@ -2,13 +2,32 @@
 
 #include "utils.h"
 #include "linalg.h"
+#include "parser.h"
 
 #include "bag_keys.h"
 
-#define EDITOR_SIZE (EDITOR_WIDTH * EDITOR_HEIGHT)
+// static char    text_grid[EDITOR_SIZE];
+// static fgbg_t color_grid[EDITOR_SIZE];
 
-static char    text_grid[EDITOR_SIZE];
-static fgbg_t color_grid[EDITOR_SIZE];
+static dck_stretchy_t (char,   unsigned)  text_grid = {0};
+static dck_stretchy_t (fgbg_t, unsigned) color_grid = {0};
+
+
+static inline unsigned token_type_to_color(token_type_t type)
+{
+    switch (type) {
+        case token_type_Identifier: return 0xFFFFFFFF;
+        case token_type_Comment:    return 0xFF66AA66;
+        case token_type_Keyword:    return 0xFF66FFFF;
+        case token_type_Literal:    return 0xFF66AAFF;
+        case token_type_Separator:  return 0xFFFFAAAA;
+        case token_type_Operator:   return 0xFFFFAAAA;
+        case token_type_Error:      return 0xFF0000FF;
+        case token_type_Empty:      return 0xFFFFFFFF;
+
+        case TOKEN_TYPE_COUNT: unreachable();
+    }
+}
 
 
 static ivec2_t index_to_coords(editor_t *editor, int index)
@@ -23,7 +42,7 @@ static ivec2_t index_to_coords(editor_t *editor, int index)
         if (i == editor->cursor_index)
             break;
 
-        if (editor->text_buffer[i] == '\n' ||  i - last_nl == EDITOR_WIDTH) {
+        if (editor->text_buffer[i] == '\n' ||  i - last_nl == editor->col_count) {
             ++curr_y;
             curr_x = -1;
             last_nl = i;
@@ -41,7 +60,7 @@ static int coords_to_index(editor_t *editor, ivec2_t coords)
 
     for (; index < editor->text_size && curr_y != coords.y; ++index) {
         if (editor->text_buffer[index] == '\n'
-         || index - last_nl == EDITOR_WIDTH)
+         || index - last_nl == editor->col_count)
         {
             ++curr_y;
             last_nl = index;
@@ -115,7 +134,7 @@ void editor_replace(editor_t *editor, int pos,   int dst_size,
 
         // FUN-FACT: It took me 5 years to read the realloc documentation and
         //           realize that realloc already does the allocating and moving
-        //           of a new buffer in case the original can't be resized...
+        //           of a new buffer in case the original can't be resized / remapped...
         editor->text_buffer = realloc(editor->text_buffer, new_capacity);
         malloc_check(editor->text_buffer);
 
@@ -160,15 +179,28 @@ void editor_init(editor_t *editor)
     *editor = (editor_t) {0};
 }
 
-void editor_render(editor_t *editor, int x_pos, int y_pos)
+void editor_render(editor_t *editor, int x_pos, int y_pos, int col_count, int row_count)
 {
+    /* set size and resize grid buffers */
+    editor->col_count = col_count;
+    editor->row_count = row_count;
+
+    int char_count = col_count * row_count;
+
+    text_grid.count  = 0;
+    dck_stretchy_reserve(text_grid, char_count);
+
+    color_grid.count = 0;
+    dck_stretchy_reserve(color_grid, char_count);
+
+    /* if cursor is out of view move it in */
     while (editor->cursor_index < editor->screen_index) {
         editor->screen_index = index_move_up_n(editor, editor->screen_index, 1);
     }
 
     ivec2_t curr = index_to_coords(editor, editor->cursor_index);
 
-    while (curr.y >= EDITOR_HEIGHT) {
+    while (curr.y >= editor->row_count) {
         editor->screen_index = index_move_down_n(editor,
                                                  editor->screen_index, 1);
 
@@ -176,9 +208,9 @@ void editor_render(editor_t *editor, int x_pos, int y_pos)
     }
 
     /* populate grids with data */
-    for (int y = 0; y < EDITOR_HEIGHT; ++y) {
-        for (int x = 0; x < EDITOR_WIDTH; ++x) {
-            color_grid[x + y * EDITOR_WIDTH] = (fgbg_t) {
+    for (int y = 0; y < editor->row_count; ++y) {
+        for (int x = 0; x < editor->col_count; ++x) {
+            color_grid.data[x + y * editor->col_count] = (fgbg_t) {
                 .fg = 0xFFFFFFFF,
                 .bg = 0xAA000000,
             };
@@ -193,20 +225,40 @@ void editor_render(editor_t *editor, int x_pos, int y_pos)
         selection_max = temp;
     }
 
+
     int text_pos = editor->screen_index;
 
-    for (int y = 0; y < EDITOR_HEIGHT; ++y) {
+    tokenizer_t toki = {
+        .begin = editor->text_buffer,
+        .pos   = editor->text_buffer,
+        .end   = editor->text_buffer + editor->text_size
+    };
+
+    token_t token = tokenizer_next(&toki, false);
+
+    while (text_pos >= token.data.end - toki.begin && token.type != token_type_Empty) {
+        token = tokenizer_next(&toki, false);
+    }
+
+
+    for (int y = 0; y < editor->row_count; ++y) {
         int x = 0;
 
-        for (; x < EDITOR_WIDTH && text_pos < editor->text_size; ++x)
+        for (; x < editor->col_count && text_pos < editor->text_size; ++x)
         {
+            while (text_pos >= token.data.end - toki.begin && token.type != token_type_Empty) {
+                token = tokenizer_next(&toki, false);
+            }
+
+            if (text_pos >= token.data.begin - toki.begin
+             && text_pos <  token.data.end   - toki.begin) {
+                color_grid.data[x + y * editor->col_count].fg = token_type_to_color(token.type);
+            }
+
             if (editor->selecting
              && text_pos >= selection_min && text_pos <= selection_max)
             {
-                color_grid[x + y * EDITOR_WIDTH] = (fgbg_t) {
-                    .fg = 0xFFFFFFFF,
-                    .bg = 0xAAAAAAAA,
-                };
+                color_grid.data[x + y * editor->col_count].bg = 0xAAAAAAAA;
             }
 
             char c = editor->text_buffer[text_pos++];
@@ -214,14 +266,14 @@ void editor_render(editor_t *editor, int x_pos, int y_pos)
             if (c == '\n')
                 break;
 
-            text_grid[x + y * EDITOR_WIDTH] = c;
+            text_grid.data[x + y * editor->col_count] = c;
         }
 
-        memset(text_grid + x + y * EDITOR_WIDTH, ' ', EDITOR_WIDTH - x);
+        memset(text_grid.data + x + y * editor->col_count, ' ', editor->col_count - x);
     }
 
     if (curr.x != -1 && curr.y != -1) {
-        color_grid[curr.x + curr.y * EDITOR_WIDTH] = (fgbg_t) {
+        color_grid.data[curr.x + curr.y * editor->col_count] = (fgbg_t) {
             .fg = 0xAA000000,
             .bg = 0xFFFFFFFF,
         };
@@ -229,7 +281,7 @@ void editor_render(editor_t *editor, int x_pos, int y_pos)
 
     /* render grids */
     gui_begin_grid();
-    gui_draw_grid(text_grid, color_grid, EDITOR_WIDTH, EDITOR_HEIGHT,
+    gui_draw_grid(text_grid.data, color_grid.data, editor->col_count, editor->row_count,
                   x_pos, y_pos, 1 * EDITOR_SCALE, 2 * EDITOR_SCALE);
 }
 
@@ -278,11 +330,11 @@ bool editor_handle_mouse_position(editor_t *editor, int x, int y,
         (event.y - y) / (2 * EDITOR_SCALE),
     };
 
-    if      (coords.x < 0)             coords.x = 0;
-    else if (coords.x >= EDITOR_WIDTH) coords.x = EDITOR_WIDTH - 1;
+    if      (coords.x < 0)                  coords.x = 0;
+    else if (coords.x >= editor->col_count) coords.x = editor->col_count - 1;
 
-    if      (coords.y < 0)              coords.y = 0;
-    else if (coords.y >= EDITOR_HEIGHT) coords.y = EDITOR_HEIGHT - 1;
+    if      (coords.y < 0)                  coords.y = 0;
+    else if (coords.y >= editor->row_count) coords.y = editor->row_count - 1;
 
     int index = coords_to_index(editor, coords);
 

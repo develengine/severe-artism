@@ -1,12 +1,15 @@
 /* TODO:
  * [X] Properly compute normal matrices when merging in model builder.
  * [X] Redo scale function and add stretch function.
+ * [X] Make the text editor resizable.
+ * [X] Add syntax highlighting to the text editor.
+ * [ ] Properly handle backspace and delete with selection.
+ * [ ] Add a way to export the model and texture.
+ * [ ] Add a way to change iteration count.
  * [ ] Add mouse scroll to the text editor.
  * [ ] Add errors to editor.
- * [ ] Add syntax highlighting to the text editor.
  * [ ] Make the text editor retractable.
- * [ ] Add way to export programs.
- * [ ] Add a way to change iteration count.
+ * [ ] Add way to export code.
  */
 
 #include "bag_engine.h"
@@ -111,7 +114,7 @@ static void try_compile(void)
 
 static void render_gui(void)
 {
-    editor_render(&editor, 0, 0);
+    editor_render(&editor, 0, 0, 81, window_height / (EDITOR_SCALE * 2));
 }
 
 
