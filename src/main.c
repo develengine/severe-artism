@@ -3,6 +3,7 @@
  * [X] Redo scale function and add stretch function.
  * [X] Make the text editor resizable.
  * [X] Add syntax highlighting to the text editor.
+ * [ ] Add scroll wheel acceleration.
  * [ ] Properly handle backspace and delete with selection.
  * [ ] Add a way to export the model and texture.
  * [ ] Add a way to change iteration count.
@@ -38,8 +39,12 @@ static bool running = true;
 static int window_width  = 1080;
 static int window_height = 720;
 
+// TODO: Get rid of these state based modifier key checks.
 static bool f11_down   = false;
 static bool fullscreen = false;
+
+// TODO: Get rid of these state based modifier key checks.
+static bool ctrl_down = false;
 
 static float fov = 90.0f;
 
@@ -111,10 +116,146 @@ static void try_compile(void)
 }
 
 
+typedef struct
+{
+    ivec2_t mouse;
+    bool mouse_down, mouse_clicked;
+
+    int hot_id;
+
+} im_t;
+
+static im_t im = {0};
+
+
+static inline bool im_button(int id, int x, int y, int w, int h, char *text)
+{
+    int rel_x = im.mouse.x - x;
+    int rel_y = im.mouse.y - y;
+
+    if (rel_x >= 0 && rel_x < w
+     && rel_y >= 0 && rel_y < h) {
+        im.hot_id = id;
+    }
+
+    color_t bg = { 0.75f, 0.75f, 1.0f, 0.5f };
+    color_t fg = { 1.0f,  1.0f,  1.0f, 1.0f };
+
+    bool was_clicked = im.hot_id == id && im.mouse_down && im.mouse_clicked;
+
+    if (was_clicked) {
+        bg = (color_t) { 0.0f, 0.0f, 0.0f, 1.0f };
+        fg = (color_t) { 1.0f, 1.0f, 1.0f, 1.0f };
+    }
+    else if (im.hot_id == id) {
+        bg = (color_t) { 1.0f, 1.0f, 1.0f, 1.0f };
+        fg = (color_t) { 0.0f, 0.0f, 0.0f, 1.0f };
+    }
+
+    gui_begin_rect();
+    gui_draw_rect(x, y, w, h, bg);
+
+    int text_size = (int)strlen(text);
+
+    int scale = 2;
+    int width = text_size * 8 * scale;
+    int height = 16 * scale;
+
+    gui_begin_text();
+    gui_draw_text_n(text, text_size,
+                    x + (w - width) / 2, y + (h - height) / 2,
+                    8 * scale, 16 * scale,
+                    0, fg);
+
+    if (was_clicked) {
+        return true;
+    }
+
+    return false;
+}
+
+
+static inline void im_label(int x, int y, int w, int h,
+                            int scale, color_t fg, color_t bg, char *text)
+{
+    gui_begin_rect();
+    gui_draw_rect(x, y, w, h, bg);
+
+    int text_size = (int)strlen(text);
+
+    int width = text_size * 8 * scale;
+    int height = 16 * scale;
+
+    gui_begin_text();
+    gui_draw_text_n(text, text_size,
+                    x + (w - width) / 2, y + (h - height) / 2,
+                    8 * scale, 16 * scale,
+                    0, fg);
+
+}
+
+
+static void export(void)
+{
+    char buffer[512] = {0};
+    strcpy(buffer, "output");
+
+    OPENFILENAMEA param = {
+        .lpstrFile = buffer,
+        .nMaxFile  = sizeof(buffer) - 1,
+    };
+    param.lStructSize = sizeof(param);
+
+    if (!GetSaveFileNameA(&param)) {
+        printf("canceled\n");
+        return;
+    }
+
+    printf("gotten: %s\n", buffer);
+}
+
 
 static void render_gui(void)
 {
     editor_render(&editor, 0, 0, 81, window_height / (EDITOR_SCALE * 2));
+
+
+    im.hot_id = -1;
+
+    int id = -1;
+
+    int butt_marg = 25;
+    int butt_gap = 10;
+    int butt_w = 200;
+    int butt_h = 50;
+    int butt_x = window_width - butt_w - butt_marg;
+    int butt_y = butt_marg;
+
+    int recompile_id = ++id;
+    if (im_button(recompile_id, butt_x, butt_y, butt_w, butt_h, "recompile")) {
+        try_compile();
+    }
+
+    if (im.hot_id == recompile_id) {
+        color_t fg = { 1.0f, 1.0f, 1.0f, 1.0f };
+        color_t bg = { 0.0f, 0.0f, 0.0f, 0.5f };
+        im_label(im.mouse.x + 16, im.mouse.y, 88, 24, 1, fg, bg, "(ctrl + r)");
+    }
+
+    butt_y += butt_h + butt_gap;
+
+    int export_id = ++id;
+    if (im_button(export_id, butt_x, butt_y, butt_w, butt_h, "export")) {
+        export();
+    }
+
+    if (im.hot_id == export_id) {
+        color_t fg = { 1.0f, 1.0f, 1.0f, 1.0f };
+        color_t bg = { 0.0f, 0.0f, 0.0f, 0.5f };
+        im_label(im.mouse.x + 16, im.mouse.y, 88, 24, 1, fg, bg, "(ctrl + e)");
+    }
+
+    im.mouse_clicked = false;
 }
 
 
@@ -388,10 +529,14 @@ int bagE_eventHandler(bagE_Event *event)
         case bagE_EventMouseButtonUp: {
             bagE_MouseButton mb = event->data.mouseButton;
 
-            if (!free_look && editor_handle_mouse_button(&editor, 0, 0, mb, down))
+            im.mouse_clicked = down != im.mouse_down;
+            im.mouse_down = down;
+
+            if (!free_look && im.hot_id == -1
+             && editor_handle_mouse_button(&editor, 0, 0, mb, down))
                 break;
 
-            if (!down && !free_look) {
+            if (!down && !free_look && im.hot_id == -1) {
                 free_look = !free_look;
                 bagE_setHiddenCursor(free_look);
             }
@@ -422,8 +567,12 @@ int bagE_eventHandler(bagE_Event *event)
                     }
                 } break;
 
-                case KEY_C: {
-                    if (!down && free_look) {
+                case KEY_CONTROL_LEFT: {
+                    ctrl_down = down;
+                } break;
+
+                case KEY_R: {
+                    if (ctrl_down || (!down && free_look)) {
                         try_compile();
                     }
                 } break;
@@ -456,7 +605,11 @@ int bagE_eventHandler(bagE_Event *event)
 
         case bagE_EventMousePosition: {
             bagE_Mouse m = event->data.mouse;
-            if (!free_look) {
+
+            im.mouse.x = event->data.mouse.x;
+            im.mouse.y = event->data.mouse.y;
+
+            if (!free_look && im.hot_id == -1) {
                 editor_handle_mouse_position(&editor, 0, 0, m);
             }
         } break;

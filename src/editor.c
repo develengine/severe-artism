@@ -27,6 +27,8 @@ static inline unsigned token_type_to_color(token_type_t type)
 
         case TOKEN_TYPE_COUNT: unreachable();
     }
+
+    unreachable();
 }
 
 

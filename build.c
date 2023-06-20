@@ -56,6 +56,7 @@ const char *libs[] = {
     "Opengl32.lib",
     "Ole32.lib",
     "ksuser.lib",
+    "Comdlg32.lib",
 #endif
     NULL
 };
