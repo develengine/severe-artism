@@ -208,3 +208,36 @@ model_data_t load_obj_file(const char *path)
     };
 }
 
+
+void model_data_export_to_obj_file(model_data_t data, const char *path)
+{
+    FILE *file = fopen(path, "w");
+    file_check(file, path);
+
+    for (int i = 0; i < data.vertex_count; ++i) {
+        float *v = data.vertices[i].positions;
+        fprintf(file, "v %f %f %f\n", v[0], v[1], v[2]);
+    }
+
+    for (int i = 0; i < data.vertex_count; ++i) {
+        float *t = data.vertices[i].textures;
+        fprintf(file, "vt %f %f\n", t[0], t[1]);
+    }
+
+    for (int i = 0; i < data.vertex_count; ++i) {
+        float *n = data.vertices[i].normals;
+        fprintf(file, "vn %f %f %f\n", n[0], n[1], n[2]);
+    }
+
+    for (int i = 0; i < data.index_count; i += 3) {
+        unsigned a = data.indices[i + 0] + 1;
+        unsigned b = data.indices[i + 1] + 1;
+        unsigned c = data.indices[i + 2] + 1;
+
+        fprintf(file, "f %d/%d/%d %d/%d/%d %d/%d/%d\n",
+                          a, a, a, b, b, b, c, c, c);
+    }
+
+    fclose(file);
+}
+

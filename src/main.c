@@ -11,6 +11,7 @@
  * [ ] Add errors to editor.
  * [ ] Make the text editor retractable.
  * [ ] Add way to export code.
+ * [ ] Do proper string extraction.
  */
 
 #include "bag_engine.h"
@@ -27,11 +28,15 @@
 #include "generator.h"
 #include "l_system.h"
 #include "parser.h"
+#include "obj_parser.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 
 static bool running = true;
@@ -80,11 +85,16 @@ static l_system_t l_system = {0};
 static parse_state_t parse_state = {0};
 
 static bool has_model = false;
+static model_builder_t builder = {0};
 static model_object_t model_object;
+
 
 
 static void try_compile(void)
 {
+    builder.data.vertex_count = 0;
+    builder.data.index_count  = 0;
+
     has_model = false;
 
     parse(&l_system, &parse_state, editor.text_buffer, editor.text_size);
@@ -104,14 +114,15 @@ static void try_compile(void)
         }
     }
 
-    l_build_t build = l_system_build(&l_system);
+    l_build_t build = l_system_build(&l_system, &builder);
 
     if (build.error) {
         printf("build error: %s\n", build.error);
         return;
     }
 
-    model_object = build.object;
+    model_object = create_model_object(builder.data);
+
     has_model = true;
 }
 
@@ -197,21 +208,52 @@ static inline void im_label(int x, int y, int w, int h,
 
 static void export(void)
 {
+    if (!has_model) {
+        printf("No model to export!\n");
+        return;
+    }
+
     char buffer[512] = {0};
     strcpy(buffer, "output");
 
     OPENFILENAMEA param = {
         .lpstrFile = buffer,
-        .nMaxFile  = sizeof(buffer) - 1,
+        .nMaxFile  = sizeof(buffer) - 5, // extension space and null byte
     };
+
     param.lStructSize = sizeof(param);
 
-    if (!GetSaveFileNameA(&param)) {
-        printf("canceled\n");
+    if (!GetSaveFileNameA(&param))
         return;
+
+
+    int path_len = strlen(buffer);
+    char *ext_obj = ".obj";
+
+    for (int i = 0; ext_obj[i]; ++i) {
+        buffer[path_len + i] = ext_obj[i];
     }
 
-    printf("gotten: %s\n", buffer);
+    model_data_export_to_obj_file(builder.data, buffer);
+
+
+    char *ext_png = ".png";
+
+    for (int i = 0; ext_png[i]; ++i) {
+        buffer[path_len + i] = ext_png[i];
+    }
+
+    stbi_flip_vertically_on_write(1);
+
+    if (!stbi_write_png(buffer,
+                        l_system.atlas.width,
+                        l_system.atlas.height,
+                        4,
+                        l_system.atlas.data,
+                        l_system.atlas.width * 4))
+    {
+        fprintf(stderr, "Failed to export atlas image!\n");
+    }
 }
 
 
@@ -231,15 +273,15 @@ static void render_gui(void)
     int butt_x = window_width - butt_w - butt_marg;
     int butt_y = butt_marg;
 
+    char *tool_tip = NULL;
+
     int recompile_id = ++id;
     if (im_button(recompile_id, butt_x, butt_y, butt_w, butt_h, "recompile")) {
         try_compile();
     }
 
     if (im.hot_id == recompile_id) {
-        color_t fg = { 1.0f, 1.0f, 1.0f, 1.0f };
-        color_t bg = { 0.0f, 0.0f, 0.0f, 0.5f };
-        im_label(im.mouse.x + 16, im.mouse.y, 88, 24, 1, fg, bg, "(ctrl + r)");
+        tool_tip = "(ctrl + r)";
     }
 
     butt_y += butt_h + butt_gap;
@@ -250,9 +292,14 @@ static void render_gui(void)
     }
 
     if (im.hot_id == export_id) {
+        tool_tip = "(ctrl + e)";
+    }
+
+    if (tool_tip) {
         color_t fg = { 1.0f, 1.0f, 1.0f, 1.0f };
-        color_t bg = { 0.0f, 0.0f, 0.0f, 0.5f };
-        im_label(im.mouse.x + 16, im.mouse.y, 88, 24, 1, fg, bg, "(ctrl + e)");
+        color_t bg = { 0.0f, 0.0f, 0.0f, 0.75f };
+        int size = (int)strlen(tool_tip);
+        im_label(im.mouse.x + 16, im.mouse.y, size * 8 + 8, 24, 1, fg, bg, tool_tip);
     }
 
     im.mouse_clicked = false;

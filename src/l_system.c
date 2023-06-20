@@ -747,10 +747,8 @@ l_eval_res_t l_evaluate(l_system_t *sys,
 }
 
 
-l_build_t l_system_build(l_system_t *sys)
+l_build_t l_system_build(l_system_t *sys, model_builder_t *builder)
 {
-    model_builder_t builder = {0};
-
     for (unsigned i = 0; i < sys->symbols[sys->id].count; ++i) {
         l_symbol_t sym = sys->symbols[sys->id].data[i];
         l_type_t type = sys->types.data[sym.type];
@@ -765,21 +763,15 @@ l_build_t l_system_build(l_system_t *sys)
 
             assert(res.val.type == l_basic_Mat4);
 
-            model_builder_merge(&builder,
+            model_builder_merge(builder,
                                 sys->resources.data[load.resource_index].model,
                                 res.val.data.matrix);
         }
     }
 
-    if (builder.data.index_count == 0)
+    if (builder->data.index_count == 0)
         return (l_build_t) { .error = "Empty object!" };
 
-    model_object_t object = create_model_object(builder.data);
-
-    free_model_data(builder.data);
-
-    return (l_build_t) {
-        .object = object,
-    };
+    return (l_build_t) {0};
 }
 

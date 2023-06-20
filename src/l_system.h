@@ -5,6 +5,7 @@
 #include "linalg.h"
 #include "res.h"
 #include "core.h"
+#include "generator.h"
 
 
 typedef enum
@@ -316,10 +317,10 @@ void l_system_print(l_system_t *sys);
 
 typedef struct
 {
-    model_object_t object;
+    model_data_t model_data;
     char *error;
 } l_build_t;
 
-l_build_t l_system_build(l_system_t *sys);
+l_build_t l_system_build(l_system_t *sys, model_builder_t *builder);
 
 #endif // L_SYSTEM
