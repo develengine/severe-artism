@@ -624,6 +624,12 @@ int bagE_eventHandler(bagE_Event *event)
                     }
                 } break;
 
+                case KEY_E: {
+                    if (ctrl_down) {
+                        export();
+                    }
+                } break;
+
                 case KEY_SPACE:      { input[input_Up]    = down; } break;
                 case KEY_SHIFT_LEFT: { input[input_Down]  = down; } break;
                 case KEY_W:          { input[input_Forth] = down; } break;
