@@ -491,21 +491,21 @@ int bagE_main(int argc, char *argv[])
 "res head = object(head_mod, stone_tex)\n"
 "res hair = sphere(3, rat_tex)\n"
 "\n"
-"def symbol_1(n: int, end: bool) {\n"
+"def brug(n: int, end: bool) {\n"
 "    head(position(float(n), 0.0, 0.0) * scale(n * 0.75))\n"
 "    hair(position(float(n), 2.5 * n * 0.75, -0.25 * n * 0.75) * scale(n * 0.75))\n"
 "}\n"
 "\n"
-"rule symbol_1(!end) {\n"
-"    symbol_1(n, true)\n"
-"    symbol_1(n * 2, false)\n"
+"rule brug(!end) {\n"
+"    brug(n, true)\n"
+"    brug(n * 2, false)\n"
 "}\n"
 "\n"
-"rule symbol_1(end) {\n"
-"    symbol_1(n, end)\n"
+"rule brug(end) {\n"
+"    brug(n, end)\n"
 "}\n"
 "\n"
-"symbol_1(1, false)\n"
+"brug(1, false)\n"
 "\n"
 ;
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
@@ -599,7 +599,7 @@ int bagE_main(int argc, char *argv[])
 
 
         /* rendering */
-        glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+        glClearColor(0.2f, 0.6f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glEnable(GL_DEPTH_TEST);

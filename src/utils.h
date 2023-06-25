@@ -20,7 +20,7 @@
     } while (0)
 #else
     #ifdef _WIN32
-        #define unreachable()   assume(0)
+        #define unreachable()   __assume(0)
     #else
         #define unreachable()   __builtin_unreachable()
     #endif
