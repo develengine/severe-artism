@@ -8,11 +8,14 @@
  * [X] Do proper string extraction.
  * [X] Add a way to change iteration count.
  * [X] Add errors to editor.
- * [ ] Fix paste cr bug.
+ * [X] Fix paste cr bug.
+ * [X] Add way to export code.
+ *
+ * Can wait, lol:
+ *
  * [ ] Fix token error column numbers.
  * [ ] Add mouse scroll to the text editor.
  * [ ] Properly handle backspace and delete with selection.
- * [ ] Add way to export code.
  *
  * [ ] Make the text editor retractable.
  * [ ] Add scroll wheel acceleration.

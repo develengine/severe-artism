@@ -470,8 +470,8 @@ bool editor_handle_key(editor_t *editor, bagE_Key event, bool down)
 
             bagE_clipPaste(editor->text_buffer + editor->cursor_index, size);
 
-            // TODO: For now we simply replace carriage returns with spaces.
-            //       This is obviously retarded.
+            // FIXME: For now we simply replace carriage returns with spaces.
+            //        This is obviously retarded.
             for (int i = 0; i < size; ++i) {
                 if (editor->text_buffer[editor->cursor_index + i] == '\r') {
                     editor->text_buffer[editor->cursor_index + i] = ' ';
