@@ -4,7 +4,6 @@
  * [X] Make the text editor resizable.
  * [X] Add syntax highlighting to the text editor.
  * [X] Add a way to export the model and texture.
- *
  * [X] Do proper string extraction.
  * [X] Add a way to change iteration count.
  * [X] Add errors to editor.
@@ -16,7 +15,7 @@
  * [ ] Fix token error column numbers.
  * [ ] Add mouse scroll to the text editor.
  * [ ] Properly handle backspace and delete with selection.
- *
+ * [ ] Add tab indentation.
  * [ ] Make the text editor retractable.
  * [ ] Add scroll wheel acceleration.
  */
@@ -181,7 +180,7 @@ static inline bool im_button(int id, int x, int y, int w, int h, char *text)
         im.hot_id = id;
     }
 
-    color_t bg = { 0.75f, 0.75f, 1.0f, 0.5f };
+    color_t bg = color_from_uint(0xAA000000);
     color_t fg = { 1.0f,  1.0f,  1.0f, 1.0f };
 
     bool was_clicked = im.hot_id == id && im.mouse_down && im.mouse_clicked;
@@ -355,7 +354,7 @@ static void render_gui(void)
 
     int butt_slim = butt_w / 8;
 
-    if (im_button(++export_id, butt_x, butt_y, butt_slim, butt_h, "<")) {
+    if (im_button(++id, butt_x, butt_y, butt_slim, butt_h, "<")) {
         if (iteration_count > 0) {
             --iteration_count;
         }
@@ -364,7 +363,7 @@ static void render_gui(void)
         try_compile();
     }
 
-    if (im_button(++export_id, butt_x + butt_slim * 7, butt_y, butt_slim, butt_h, ">")) {
+    if (im_button(++id, butt_x + butt_slim * 7, butt_y, butt_slim, butt_h, ">")) {
         ++iteration_count;
 
         // TODO: Implement rebuild so that we don't have to recompile the whole system again.
@@ -389,7 +388,7 @@ static void render_gui(void)
             iter_buffer[idx - i - 1] = tmp;
         }
 
-        color_t bg = { 0.75f, 0.75f, 1.0f, 0.5f };
+        color_t bg = color_from_uint(0xAA000000);
         color_t fg = { 1.0f,  1.0f,  1.0f, 1.0f };
 
         if (im_label(butt_x + butt_slim + butt_gap, butt_y,
@@ -411,6 +410,23 @@ static void render_gui(void)
 
     if (im.hot_id == save_to_clip_id) {
         tool_tip = "Copies whole source code to clipboard.";
+    }
+
+    butt_y += butt_h + butt_gap;
+
+    int clear_id = ++id;
+    if (im_button(clear_id, butt_x, butt_y, butt_w, butt_h, "clear code")) {
+        editor.text_size = 0;
+        editor.cursor_index = 0;
+        editor.screen_index = 0;
+        editor.selecting = false;
+        editor.selection_start = 0;
+
+        printf("Cleared\n");
+    }
+
+    if (im.hot_id == clear_id) {
+        tool_tip = "Removes current code.";
     }
 
     if (tool_tip) {
@@ -443,7 +459,7 @@ int bagE_main(int argc, char *argv[])
 
     print_context_info();
 
-    bagE_setWindowTitle("severe artism");
+    bagE_setWindowTitle("LLL");
 
     bagE_setSwapInterval(1);
 
@@ -464,7 +480,8 @@ int bagE_main(int argc, char *argv[])
 
     editor_init(&editor);
     char text[] =
-"#* Hi, this is a barely working proof of concept... *#\n"
+"#* https://github.com/develengine/severe-artism\n"
+"   author: Jakub Boros *#\n"
 "\n"
 "tex stone_tex(\"res/stone.png\")\n"
 "tex rat_tex(\"res/rat.png\")\n"
@@ -654,7 +671,7 @@ int bagE_main(int argc, char *argv[])
             cumm %= bagT_getFreq();
 
             char buffer[64] = {0};
-            snprintf(buffer, sizeof(buffer), "severe artism, FPS: %d\n", frame_count);
+            snprintf(buffer, sizeof(buffer), "LLL, FPS: %d\n", frame_count);
             bagE_setWindowTitle(buffer);
 
             frame_count = 0;
