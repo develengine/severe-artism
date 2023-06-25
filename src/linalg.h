@@ -243,6 +243,16 @@ static inline vector_t vector_transform(vector_t v, matrix_t m)
     return res;
 }
 
+static inline color_t color_from_uint(unsigned x)
+{
+    return (color_t) {{
+        ((x >> 0)  & 0xFF) / 255.0f,
+        ((x >> 8)  & 0xFF) / 255.0f,
+        ((x >> 16) & 0xFF) / 255.0f,
+        ((x >> 24) & 0xFF) / 255.0f,
+    }};
+}
+
 
 typedef union
 {

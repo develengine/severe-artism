@@ -574,8 +574,7 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
         } break;
 
         case l_inst_And: /* fallthrough */
-        case l_inst_Or:  /* fallthrough */
-        case l_inst_Not:
+        case l_inst_Or:
         {
             assert(data_size >= 2);
 
@@ -591,12 +590,28 @@ l_eval_res_t l_evaluate_instruction(l_instruction_t inst,
                 bool ba = a.data.boolean;
                 bool bb = b.data.boolean;
 
-                if      (inst.id == l_inst_And) res.data.boolean = ba <  bb;
-                else if (inst.id == l_inst_Or)  res.data.boolean = ba >  bb;
-                else                            res.data.boolean = ba != bb;
+                if (inst.id == l_inst_And) res.data.boolean = ba && bb;
+                else                       res.data.boolean = ba || bb;
             }
 
             return (l_eval_res_t) { res, 2 };
+        } break;
+
+        case l_inst_Not:
+        {
+            assert(data_size >= 1);
+            l_value_t a = data_top[ 0];
+
+            l_value_t res = { .type = l_basic_Bool };
+
+            if (a.type != l_basic_Bool)
+                return (l_eval_res_t) { .error = "Logical negation takes only booleans!" };
+
+            if (compute) {
+                res.data.boolean = !a.data.boolean;
+            }
+
+            return (l_eval_res_t) { res, 1 };
         } break;
 
         case l_inst_CastInt:   /* fallthrough */

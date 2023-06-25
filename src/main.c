@@ -3,15 +3,19 @@
  * [X] Redo scale function and add stretch function.
  * [X] Make the text editor resizable.
  * [X] Add syntax highlighting to the text editor.
- * [ ] Add scroll wheel acceleration.
- * [ ] Properly handle backspace and delete with selection.
- * [ ] Add a way to export the model and texture.
- * [ ] Add a way to change iteration count.
+ * [X] Add a way to export the model and texture.
+ *
+ * [X] Do proper string extraction.
+ * [X] Add a way to change iteration count.
+ * [X] Add errors to editor.
+ * [ ] Fix paste cr bug.
+ * [ ] Fix token error column numbers.
  * [ ] Add mouse scroll to the text editor.
- * [ ] Add errors to editor.
- * [ ] Make the text editor retractable.
+ * [ ] Properly handle backspace and delete with selection.
  * [ ] Add way to export code.
- * [ ] Do proper string extraction.
+ *
+ * [ ] Make the text editor retractable.
+ * [ ] Add scroll wheel acceleration.
  */
 
 #include "bag_engine.h"
@@ -84,46 +88,71 @@ static l_system_t l_system = {0};
 
 static parse_state_t parse_state = {0};
 
+#define ERROR_MESSAGE_CAPACITY 256
+static char error_message_buffer[ERROR_MESSAGE_CAPACITY] = {0};
+
 static bool has_model = false;
 static model_builder_t builder = {0};
 static model_object_t model_object;
 
+static int iteration_count = 8;
 
 
-static void try_compile(void)
+static void try_rebuild(void)
 {
     builder.data.vertex_count = 0;
     builder.data.index_count  = 0;
 
-    has_model = false;
-
-    parse(&l_system, &parse_state, editor.text_buffer, editor.text_size);
-
-    if (!parse_state.res.success) {
-        printf("%zd:%zd ", parse_state.res.line, parse_state.res.col);
-        sv_fwrite(parse_state.res.message, stdout);
-        printf("\n");
-        return;
+    if (has_model) {
+        free_model_object(model_object);
+        has_model = false;
     }
 
     /* iterate the system */
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 0; i < iteration_count; ++i) {
         char *error = l_system_update(&l_system);
         if (error) {
-            printf("runtime error: %s\n", error);
+            snprintf(error_message_buffer, ERROR_MESSAGE_CAPACITY,
+                    "runtime error: %s\n", error);
         }
     }
 
     l_build_t build = l_system_build(&l_system, &builder);
 
     if (build.error) {
-        printf("build error: %s\n", build.error);
+        snprintf(error_message_buffer, ERROR_MESSAGE_CAPACITY,
+                "build error: %s\n", build.error);
         return;
     }
 
     model_object = create_model_object(builder.data);
 
     has_model = true;
+}
+
+
+static void try_compile(void)
+{
+    memset(error_message_buffer, 0, ERROR_MESSAGE_CAPACITY);
+
+    if (has_model) {
+        free_model_object(model_object);
+        has_model = false;
+    }
+
+    parse(&l_system, &parse_state, editor.text_buffer, editor.text_size);
+
+    if (!parse_state.res.success) {
+        int i = snprintf(error_message_buffer, ERROR_MESSAGE_CAPACITY,
+                        "%zd:%zd ", parse_state.res.line, parse_state.res.col);
+        for (char *p = parse_state.res.message.begin; p != parse_state.res.message.end; ++p, ++i) {
+            error_message_buffer[i] = *p;
+        }
+
+        return;
+    }
+
+    try_rebuild();
 }
 
 
@@ -186,7 +215,7 @@ static inline bool im_button(int id, int x, int y, int w, int h, char *text)
 }
 
 
-static inline void im_label(int x, int y, int w, int h,
+static inline bool im_label(int x, int y, int w, int h,
                             int scale, color_t fg, color_t bg, char *text)
 {
     gui_begin_rect();
@@ -203,6 +232,10 @@ static inline void im_label(int x, int y, int w, int h,
                     8 * scale, 16 * scale,
                     0, fg);
 
+    int rel_x = im.mouse.x - x;
+    int rel_y = im.mouse.y - y;
+
+    return rel_x >= 0 && rel_x < w && rel_y >= 0 && rel_y < h;
 }
 
 
@@ -227,7 +260,7 @@ static void export(void)
         return;
 
 
-    int path_len = strlen(buffer);
+    int path_len = (int)strlen(buffer);
     char *ext_obj = ".obj";
 
     for (int i = 0; ext_obj[i]; ++i) {
@@ -259,12 +292,34 @@ static void export(void)
 
 static void render_gui(void)
 {
-    editor_render(&editor, 0, 0, 81, window_height / (EDITOR_SCALE * 2));
-
-
     im.hot_id = -1;
-
     int id = -1;
+    char *tool_tip = NULL;
+
+    /* Text editor and Errors */
+    {
+        color_t bg = color_from_uint(0xAA000000);
+        color_t fg = { 1.0f,  1.0f,  1.0f, 1.0f };
+
+        int err_min_height = 64;
+        int editor_rows = (window_height - err_min_height) / (EDITOR_SCALE * 2);
+
+        editor_render(&editor, 0, 0, 81, editor_rows);
+
+        int err_y = editor_rows * EDITOR_SCALE * 2;
+        int gap = 4;
+
+        char *text = "Compilation successful!";
+        if (error_message_buffer[0]) {
+            text = error_message_buffer;
+        }
+
+        if (im_label(0, err_y + gap, 81 * EDITOR_SCALE,
+                     window_height - err_y - gap, 1, fg, bg, text))
+        {
+            im.hot_id = -2;
+        }
+    }
 
     int butt_marg = 25;
     int butt_gap = 10;
@@ -272,8 +327,6 @@ static void render_gui(void)
     int butt_h = 50;
     int butt_x = window_width - butt_w - butt_marg;
     int butt_y = butt_marg;
-
-    char *tool_tip = NULL;
 
     int recompile_id = ++id;
     if (im_button(recompile_id, butt_x, butt_y, butt_w, butt_h, "recompile")) {
@@ -295,11 +348,81 @@ static void render_gui(void)
         tool_tip = "(ctrl + e)";
     }
 
+    butt_y += butt_h + butt_gap;
+
+    int butt_slim = butt_w / 8;
+
+    if (im_button(++export_id, butt_x, butt_y, butt_slim, butt_h, "<")) {
+        if (iteration_count > 0) {
+            --iteration_count;
+        }
+
+        // TODO: Implement rebuild so that we don't have to recompile the whole system again.
+        try_compile();
+    }
+
+    if (im_button(++export_id, butt_x + butt_slim * 7, butt_y, butt_slim, butt_h, ">")) {
+        ++iteration_count;
+
+        // TODO: Implement rebuild so that we don't have to recompile the whole system again.
+        try_compile();
+    }
+
+    {
+        char iter_buffer[16] = { '0' };
+
+        int iter_count = iteration_count;
+
+        int idx = 0;
+        for (; iter_count; ++idx) {
+            int dec = iter_count % 10;
+            iter_count /= 10;
+            iter_buffer[idx] = '0' + (char)dec;
+        }
+
+        for (int i = 0; i < idx  / 2; ++i) {
+            char tmp = iter_buffer[i];
+            iter_buffer[i] = iter_buffer[idx - i - 1];
+            iter_buffer[idx - i - 1] = tmp;
+        }
+
+        color_t bg = { 0.75f, 0.75f, 1.0f, 0.5f };
+        color_t fg = { 1.0f,  1.0f,  1.0f, 1.0f };
+
+        if (im_label(butt_x + butt_slim + butt_gap, butt_y,
+                     butt_slim * 6 - butt_gap * 2, butt_h,
+                     2, fg, bg, iter_buffer))
+        {
+            tool_tip = "Iteration Count";
+            im.hot_id = -2;
+        }
+    }
+
+    butt_y += butt_h + butt_gap;
+
+    int save_to_clip_id = ++id;
+    if (im_button(save_to_clip_id, butt_x, butt_y, butt_w, butt_h, "copy code")) {
+        bagE_clipCopy(editor.text_buffer, editor.text_size);
+        printf("Copied\n");
+    }
+
+    if (im.hot_id == save_to_clip_id) {
+        tool_tip = "Copies whole source code to clipboard.";
+    }
+
     if (tool_tip) {
         color_t fg = { 1.0f, 1.0f, 1.0f, 1.0f };
         color_t bg = { 0.0f, 0.0f, 0.0f, 0.75f };
         int size = (int)strlen(tool_tip);
-        im_label(im.mouse.x + 16, im.mouse.y, size * 8 + 8, 24, 1, fg, bg, tool_tip);
+
+        int tip_x = im.mouse.x + 16;
+        int tip_w = size * 8 + 8;
+
+        if (tip_x + tip_w > window_width) {
+            tip_x -= size * 8 + 32;
+        }
+
+        im_label(tip_x, im.mouse.y, tip_w, 24, 1, fg, bg, tool_tip);
     }
 
     im.mouse_clicked = false;
@@ -338,16 +461,7 @@ int bagE_main(int argc, char *argv[])
 
     editor_init(&editor);
     char text[] =
-"#* Hi, this is a barely working proof of concept...\n"
-" *\n"
-" * You can click on this editor here to change the code.\n"
-" * If the code fails to compile an error message will be shown\n"
-" * in the stdout 'command prompt'.\n"
-" *\n"
-" * You can also click outside, then you can move around like in minecraft\n"
-" * creative mode, (w, a, s, d, shift, space and mouse).\n"
-" * Whilst in this mode you can press `c` to recompile the code.\n"
-" * Press 'esc' to gain back cursor. *#\n"
+"#* Hi, this is a barely working proof of concept... *#\n"
 "\n"
 "tex stone_tex(\"res/stone.png\")\n"
 "tex rat_tex(\"res/rat.png\")\n"
@@ -357,24 +471,21 @@ int bagE_main(int argc, char *argv[])
 "res head = object(head_mod, stone_tex)\n"
 "res hair = sphere(3, rat_tex)\n"
 "\n"
-"def symbol_1(n: int) {\n"
+"def symbol_1(n: int, end: bool) {\n"
 "    head(position(float(n), 0.0, 0.0) * scale(n * 0.75))\n"
 "    hair(position(float(n), 2.5 * n * 0.75, -0.25 * n * 0.75) * scale(n * 0.75))\n"
 "}\n"
 "\n"
-"# this is a rewriting rule, it matches\n"
-"# by the specified type `symbol_1` and an expression `true`\n"
-"# the expression can depend on the above defined parameters\n"
-"\n"
-"rule symbol_1(true) {\n"
-"    symbol_1(n)\n"
-"    symbol_1(n * 2)\n"
+"rule symbol_1(!end) {\n"
+"    symbol_1(n, true)\n"
+"    symbol_1(n * 2, false)\n"
 "}\n"
 "\n"
-"# this way you insert starting symbols into the system\n"
-"# the system will iterate 8 times, (for now fixed number)\n"
+"rule symbol_1(end) {\n"
+"    symbol_1(n, end)\n"
+"}\n"
 "\n"
-"symbol_1(1)\n"
+"symbol_1(1, false)\n"
 "\n"
 ;
     editor_replace(&editor, 0, 0, text, (int)strlen(text));
@@ -583,9 +694,16 @@ int bagE_eventHandler(bagE_Event *event)
              && editor_handle_mouse_button(&editor, 0, 0, mb, down))
                 break;
 
-            if (!down && !free_look && im.hot_id == -1) {
+            if (down && !free_look && im.hot_id == -1) {
                 free_look = !free_look;
                 bagE_setHiddenCursor(free_look);
+                break;
+            }
+
+            if (free_look && down) {
+                free_look = false;
+                bagE_setHiddenCursor(false);
+                break;
             }
         } break;
 

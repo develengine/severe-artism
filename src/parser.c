@@ -546,6 +546,31 @@ static inline float data_to_float(sv_t sv)
 }
 
 
+static inline int extract_string_data(sv_t sv, char *dest, int capacity)
+{
+    int buff_index = 0;
+
+    for (int i = 1; sv.begin[i] != '"'; ++i, ++buff_index) {
+        char c = sv.begin[i];
+
+        if (c == '\\') {
+            ++i;
+            c = sv.begin[i];
+        }
+
+        assert(buff_index < capacity - 1);
+
+        dest[buff_index] = c;
+    }
+
+    assert(buff_index < capacity);
+
+    dest[buff_index] = '\0';
+
+    return buff_index;
+}
+
+
 static parse_result_t err(tokenizer_t *toki, token_t token, char *msg)
 {
     size_t col = 0;
@@ -858,6 +883,9 @@ parse_expr_res_t parse_expression(tokenizer_t *toki, l_system_t *sys,
     };
 }
 
+// TODO: Do this differently maybe? Idunno
+#define MAX_PATH_SIZE 512
+char path_buffer[MAX_PATH_SIZE];
 
 static parse_result_t parse_texture(parse_state_t *state, tokenizer_t *toki, l_system_t *sys)
 {
@@ -887,7 +915,7 @@ static parse_result_t parse_texture(parse_state_t *state, tokenizer_t *toki, l_s
     if (token.type != token_type_Literal || token.meta.lit != token_lit_String)
         return err(toki, token, "Expected string!");
 
-    sv_t path = { .begin = token.data.begin + 1, .end = token.data.end - 1 };
+    sv_t string_data = token.data;
 
 
     next_checked_token(token, toki);
@@ -897,10 +925,8 @@ static parse_result_t parse_texture(parse_state_t *state, tokenizer_t *toki, l_s
 
 
     /* load texture data */
-    path.end[0] = 0;
-    // FIXME: String escape codes break the whole thing.
-    texture_data_t tex = load_texture_data(path.begin);
-    path.end[0] = '"';
+    extract_string_data(string_data, path_buffer, MAX_PATH_SIZE);
+    texture_data_t tex = load_texture_data(path_buffer);
 
     if (!tex.data)
         return err(toki, token, "Can't load this texture path!");
@@ -944,8 +970,8 @@ static parse_result_t parse_model(parse_state_t *state, tokenizer_t *toki, l_sys
     if (token.type != token_type_Literal || token.meta.lit != token_lit_String)
         return err(toki, token, "Expected string!");
 
+    sv_t string_data = token.data;
 
-    sv_t path = { .begin = token.data.begin + 1, .end = token.data.end - 1 };
 
     next_checked_token(token, toki);
 
@@ -954,10 +980,8 @@ static parse_result_t parse_model(parse_state_t *state, tokenizer_t *toki, l_sys
 
 
     /* load model data */
-    path.end[0] = 0;
-    // FIXME: String escape codes break the whole thing.
-    model_data_t mod = load_obj_file(path.begin);
-    path.end[0] = '"';
+    extract_string_data(string_data, path_buffer, MAX_PATH_SIZE);
+    model_data_t mod = load_obj_file(path_buffer);
 
     if (!mod.vertices)
         return err(toki, token, "Can't load this model path!");
@@ -1527,9 +1551,8 @@ void parse(l_system_t *sys, parse_state_t *state, char *text, size_t text_size)
 {
     /* empty everything */
     l_system_empty(sys);
-
-    parse_state_reset(state);
     l_system_reset(sys);
+    parse_state_reset(state);
 
     /* parse */
     tokenizer_t toki = {
