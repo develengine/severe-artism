@@ -481,7 +481,8 @@ int bagE_main(int argc, char *argv[])
     editor_init(&editor);
     char text[] =
 "#* https://github.com/develengine/severe-artism\n"
-"   author: Jakub Boros *#\n"
+"   author: Jakub Boros\n"
+"   Masaryk University in Brno, course PV097, Spring 2023 *#\n"
 "\n"
 "tex stone_tex(\"res/stone.png\")\n"
 "tex rat_tex(\"res/rat.png\")\n"
