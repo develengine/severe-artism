@@ -9,7 +9,7 @@
 const int bagE_defaultWindowWidth = 1080;
 const int bagE_defaultWindowHeight = 720;
 const int bagE_oglContextMajorVersion = 4;
-const int bagE_oglContextMinorVersion = 6;
+const int bagE_oglContextMinorVersion = 5;
 const char *bagE_defaultTitle = "bag engine";
 const int bagE_multisample = 0;
 

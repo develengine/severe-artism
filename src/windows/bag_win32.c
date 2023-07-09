@@ -54,11 +54,17 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 
 #define WGL_CONTEXT_MAJOR_VERSION_ARB     0x2091
 #define WGL_CONTEXT_MINOR_VERSION_ARB     0x2092
-#define WGL_CONTEXT_FLAGS_ARB             0x2094
 #define WGL_SUPPORT_OPENGL_ARB            0x2010
 #define WGL_SAMPLES_ARB                   0x2042
 
+#define WGL_CONTEXT_FLAGS_ARB             0x2094
 #define WGL_CONTEXT_DEBUG_BIT_ARB         0x00000001
+
+#define WGL_CONTEXT_PROFILE_MASK_ARB      0x9126
+#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB  0x00000001
+#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+#define ERROR_INVALID_PROFILE_ARB         0x2096
+
 
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
@@ -353,8 +359,9 @@ int WinMain(
         int attribs[] = {
             WGL_CONTEXT_MAJOR_VERSION_ARB, bagE_oglContextMajorVersion,
             WGL_CONTEXT_MINOR_VERSION_ARB, bagE_oglContextMinorVersion,
-            WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+            // WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
             WGL_CONTEXT_FLAGS_ARB, contextFlags,
+            WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
             // WGL_SAMPLES_ARB, 4,
             0
         };
